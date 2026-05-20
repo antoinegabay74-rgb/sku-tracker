@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SKU Tracker</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;color:#1a1a1a;font-size:14px;min-height:100vh}
+.app{display:flex;min-height:100vh}
+/* Sidebar */
+.sb{width:195px;min-width:195px;background:#fff;border-right:1px solid #e0e0e0;display:flex;flex-direction:column;padding:16px 0;position:sticky;top:0;height:100vh}
+.sb-logo{padding:0 14px 18px;font-size:14px;font-weight:700;color:#4a7c14}
+.sb-logo span{display:block;font-size:10px;font-weight:400;color:#999;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px}
+.nb{width:100%;padding:8px 10px;border:none;background:none;cursor:pointer;font-family:inherit;font-size:13px;color:#777;text-align:left;border-radius:7px;transition:all .1s}
+.nb:hover{background:#f5f5f5;color:#333}
+.nb.on{background:#eef5e6;color:#4a7c14;font-weight:600}
+.sb-emp{margin-top:auto;padding:12px 10px;border-top:1px solid #eee}
+.sb-emp label{display:block;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px}
+select{width:100%;padding:7px 8px;border:1px solid #ddd;border-radius:7px;font-family:inherit;font-size:12px;background:#f9f9f9;outline:none;cursor:pointer}
+select:focus{border-color:#4a7c14}
+/* Main */
+.main{flex:1;overflow:auto}
+.hdr{padding:18px 22px 13px;border-bottom:1px solid #eee;background:#fff;position:sticky;top:0;z-index:9}
+.hdr h1{font-size:16px;font-weight:700}
+.hdr p{font-size:12px;color:#888;margin-top:2px}
+.ct{padding:20px 22px}
+/* Alerts */
+.warn{background:#fff8e1;border:1px solid #ffcc02;border-radius:8px;padding:9px 13px;margin-bottom:14px;font-size:12px;color:#7a5f00}
+/* Table */
+.twrap{overflow-x:auto;border-radius:9px;border:1px solid #e0e0e0;background:#fff}
+table{border-collapse:collapse;width:100%}
+th{background:#f9f9f9;color:#888;font-size:10px;letter-spacing:.8px;text-transform:uppercase;padding:9px 11px;text-align:left;border-bottom:1px solid #eee;white-space:nowrap;font-weight:600}
+th.ac{text-align:center;min-width:90px}
+td{border-bottom:1px solid #f0f0f0;border-right:1px solid #f0f0f0;padding:0;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+.sku-cell{padding:10px 11px;background:#fafafa;min-width:155px}
+.sku-name{font-weight:600;font-size:12px}
+.sku-price{font-size:14px;font-weight:700;color:#e53935;margin-top:2px}
+.sku-target{font-size:9px;color:#aaa;margin-top:1px}
+.cb{width:100%;height:44px;border:none;cursor:pointer;background:transparent;font-size:18px;transition:background .1s;display:flex;align-items:center;justify-content:center;color:#ddd}
+.cb.done{background:#eef5e6;color:#4a7c14}
+.cb.done:hover{background:#dff0cb}
+.cb.todo:hover{background:#f5f5f5;color:#aaa}
+/* Dashboard */
+.stats{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.stat{background:#fff;border:1px solid #e0e0e0;border-radius:9px;padding:12px 16px;flex:1;min-width:100px}
+.stat-v{font-size:26px;font-weight:700;color:#4a7c14}
+.stat-l{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#999;margin-top:1px}
+.prog-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.prog-name{font-size:12px;width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.prog-bar{flex:1;height:6px;background:#eee;border-radius:99px;overflow:hidden}
+.prog-fill{height:100%;background:#4a7c14;border-radius:99px;transition:width .3s}
+.prog-pct{font-size:10px;color:#aaa;width:34px;text-align:right}
+/* Forms */
+.card{background:#fff;border:1px solid #e0e0e0;border-radius:9px;padding:17px;margin-bottom:13px}
+.card h3{font-size:13px;font-weight:700;margin-bottom:12px}
+.row{display:flex;gap:8px;margin-bottom:9px;flex-wrap:wrap}
+input[type=text],.ta{padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-family:inherit;font-size:12px;background:#f9f9f9;outline:none;color:#1a1a1a;flex:1;min-width:80px}
+input[type=text]:focus,.ta:focus{border-color:#4a7c14}
+.inp-sm{width:80px;flex:none}
+.ta{resize:vertical;width:100%;margin-bottom:8px}
+.btn{padding:8px 13px;border:1px solid #ddd;border-radius:7px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;background:#f5f5f5;color:#333;transition:all .1s;white-space:nowrap}
+.btn:hover{border-color:#4a7c14;color:#4a7c14}
+.btn.g{background:#4a7c14;color:#fff;border-color:#4a7c14}
+.btn.g:hover{background:#3a6010}
+.li{display:flex;align-items:center;justify-content:space-between;padding:7px 9px;background:#f9f9f9;border-radius:6px;margin-bottom:5px;font-size:12px}
+.li-meta{font-size:10px;color:#aaa;margin-top:1px}
+.del{padding:4px 7px;background:none;border:1px solid #ddd;border-radius:5px;cursor:pointer;font-size:12px;color:#aaa;transition:all .1s;margin-left:8px}
+.del:hover{border-color:#e91e63;color:#e91e63}
+.tag{display:inline-flex;padding:3px 9px;border-radius:99px;font-size:11px;margin:2px;cursor:pointer;border:1px solid #ddd;background:#f5f5f5;color:#888;transition:all .1s;user-select:none}
+.tag.on{background:#eef5e6;border-color:#4a7c14;color:#4a7c14}
+.tags{margin:6px 0 10px;display:flex;flex-wrap:wrap}
+.lbl{font-size:11px;color:#aaa;margin-bottom:3px}
+.err-box{display:none;font-size:12px;padding:7px 10px;border-radius:6px;margin-top:6px}
+.err-box.red{background:#fdecea;color:#c0392b}
+.err-box.green{background:#e8f5e9;color:#2e7d32}
+.empty{text-align:center;padding:50px;color:#bbb;font-size:13px}
+.divider{border-bottom:1px solid #eee;margin-bottom:14px;padding-bottom:14px}
+</style>
+</head>
+<body>
+<div class="app" id="app" style="display:none">
+  <aside class="sb">
+    <div class="sb-logo">SKU Tracker<span>Vintage Manager</span></div>
+    <div style="padding:0 8px">
+      <button class="nb on" id="n-tracker" onclick="go('tracker')">◫ &nbsp;Tracker</button>
+      <button class="nb" id="n-dash" onclick="go('dash')">▦ &nbsp;Tableau de bord</button>
+      <button class="nb" id="n-settings" onclick="go('settings')">⚙ &nbsp;Configuration</button>
+    </div>
+    <div class="sb-emp">
+      <label>Employée active</label>
+      <select id="empSel" onchange="pickEmp(this.value)"></select>
+    </div>
+  </aside>
+  <main class="main">
+    <div id="v-tracker"></div>
+    <div id="v-dash" style="display:none"></div>
+    <div id="v-settings" style="display:none"></div>
+  </main>
+</div>
+<div id="loading" style="display:flex;align-items:center;justify-content:center;height:100vh;font-size:14px;color:#999">
+  Connexion…
+</div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const DB = 'https://vinted-9aa6a-default-rtdb.europe-west1.firebasedatabase.app';
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+// Store as objects {id: data} — avoids Firebase array conversion issues
+let S = { emps:{}, accs:{}, skus:{}, prog:{} };
+let emp = ''; // current employee id
+let tab = 'tracker';
+
+// ── FIREBASE ──────────────────────────────────────────────────────────────────
+async function GET(path) {
+  try {
+    const r = await fetch(`${DB}/${path}.json`);
+    if (!r.ok) return null;
+    return await r.json();
+  } catch(e) { return null; }
+}
+
+async function SET(path, val) {
+  try {
+    const r = await fetch(`${DB}/${path}.json`, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(val)
+    });
+    return r.ok;
+  } catch(e) { return false; }
+}
+
+async function PATCH(path, val) {
+  try {
+    await fetch(`${DB}/${path}.json`, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(val)
+    });
+  } catch(e) {}
+}
+
+// ── SYNC ──────────────────────────────────────────────────────────────────────
+async function sync() {
+  const [emps, accs, skus, prog] = await Promise.all([
+    GET('emps'), GET('accs'), GET('skus'), GET('prog')
+  ]);
+  if (emps !== null) S.emps = emps || {};
+  if (accs !== null) S.accs = accs || {};
+  if (skus !== null) S.skus = skus || {};
+  if (prog !== null) S.prog = prog || {};
+  rebuildEmpSel();
+  // Don't redraw settings while user is typing
+  if (tab !== 'settings') draw();
+  else if (tab === 'tracker') drawTracker();
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+const uid = () => '_' + Math.random().toString(36).slice(2,9);
+const eName = id => S.emps[id] ? S.emps[id].name : '?';
+const eArr  = () => Object.entries(S.emps).map(([id,v])=>({id,...v}));
+const aArr  = () => Object.entries(S.accs).map(([id,v])=>({id,...v}));
+const sArr  = () => Object.entries(S.skus).map(([id,v])=>({id,...v}));
+
+function myAccs() {
+  if (!emp) return aArr();
+  return aArr().filter(a => a.empIds && a.empIds[emp]);
+}
+
+function mySkus() {
+  if (!emp) return sArr();
+  return sArr().filter(s => s.empIds === 'all' || (s.empIds && s.empIds[emp]));
+}
+
+function calcPrice(s) {
+  if (!s.basePrice || !emp) return s.price || '';
+  const n = eName(emp).toLowerCase();
+  let p = parseFloat(s.basePrice);
+  if (n.includes('inha')) p += 1;
+  else if (n.includes('haingotiana')) p -= 1;
+  return p.toFixed(2).replace('.', ',');
+}
+
+function isDone(sid, aid) {
+  return !!(S.prog[`${sid}__${aid}__${emp||'x'}`]);
+}
+
+// ── EMP SELECTOR ──────────────────────────────────────────────────────────────
+function rebuildEmpSel() {
+  const sel = document.getElementById('empSel');
+  if (!sel) return;
+  const prev = emp;
+  sel.innerHTML = '';
+  const arr = eArr();
+  if (!arr.length) {
+    sel.innerHTML = '<option value="">— Aucune —</option>';
+    emp = '';
+    return;
+  }
+  arr.forEach(e => {
+    const o = document.createElement('option');
+    o.value = e.id; o.textContent = e.name;
+    sel.appendChild(o);
+  });
+  if (prev && S.emps[prev]) { sel.value = prev; emp = prev; }
+  else { emp = arr[0].id; sel.value = emp; }
+}
+
+function pickEmp(id) { emp = id; draw(); }
+
+// ── NAV ───────────────────────────────────────────────────────────────────────
+function go(t) {
+  tab = t;
+  ['tracker','dash','settings'].forEach(x => {
+    document.getElementById('v-'+x).style.display = x===t ? 'block' : 'none';
+    document.getElementById('n-'+x).className = 'nb' + (x===t?' on':'');
+  });
+  draw();
+}
+
+function draw() {
+  if (tab==='tracker') drawTracker();
+  else if (tab==='dash') drawDash();
+  else drawSettings();
+}
+
+// ── TRACKER ───────────────────────────────────────────────────────────────────
+function drawTracker() {
+  const accs = myAccs(), skus = mySkus();
+  const en = emp ? eName(emp) : null;
+  let h = `<div class="hdr"><h1>Tracker SKU</h1>
+    <p>${skus.length} SKU · ${accs.length} compte${accs.length!==1?'s':''}${en?' · '+en:' · Sélectionne une employée'}</p></div>
+    <div class="ct">`;
+  if (!emp) h += `<div class="warn">⚠️ Sélectionne une employée dans la barre de gauche.</div>`;
+  if (emp && !accs.length) h += `<div class="warn">⚠️ Aucun compte associé à cette employée. Va dans Configuration.</div>`;
+  if (!skus.length || !accs.length) {
+    h += `<div class="empty">Ajoute des SKUs et des comptes dans Configuration.</div>`;
+  } else {
+    h += `<div class="twrap"><table><thead><tr><th>SKU / Article</th>`;
+    accs.forEach(a => h += `<th class="ac">${a.name}</th>`);
+    h += `</tr></thead><tbody>`;
+    skus.forEach(s => {
+      h += `<tr><td><div class="sku-cell">
+        <div class="sku-name">${s.name}</div>
+        <div class="sku-price">${calcPrice(s)} €</div>
+        <div class="sku-target">${s.empIds==='all'?'Toutes':'Ciblé'}</div>
+      </div></td>`;
+      accs.forEach(a => {
+        const done = isDone(s.id, a.id);
+        h += `<td><button class="cb ${done?'done':'todo'}" onclick="tick('${s.id}','${a.id}')">${done?'✓':'·'}</button></td>`;
+      });
+      h += `</tr>`;
+    });
+    h += `</tbody></table></div>`;
+  }
+  h += `</div>`;
+  document.getElementById('v-tracker').innerHTML = h;
+}
+
+async function tick(sid, aid) {
+  const k = `${sid}__${aid}__${emp||'x'}`;
+  const val = !isDone(sid, aid);
+  S.prog[k] = val;
+  drawTracker();
+  await PATCH('prog', {[k]: val});
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+function drawDash() {
+  const accs = myAccs(), skus = mySkus();
+  const tot = skus.length * accs.length;
+  const done = skus.reduce((n,s) => n + accs.filter(a => isDone(s.id,a.id)).length, 0);
+  const pct = tot ? Math.round(done/tot*100) : 0;
+  let h = `<div class="hdr"><h1>Tableau de bord</h1><p>Avancement</p></div><div class="ct">
+    <div class="stats">
+      <div class="stat"><div class="stat-v">${done}</div><div class="stat-l">Publiés</div></div>
+      <div class="stat"><div class="stat-v">${tot-done}</div><div class="stat-l">Restants</div></div>
+      <div class="stat"><div class="stat-v">${pct}%</div><div class="stat-l">Complété</div></div>
+    </div>`;
+  if (accs.length && skus.length) {
+    h += `<div class="card"><h3>Par compte</h3>`;
+    accs.forEach(a => {
+      const d = skus.filter(s=>isDone(s.id,a.id)).length;
+      const p = skus.length ? Math.round(d/skus.length*100) : 0;
+      h += `<div class="prog-row"><div class="prog-name">${a.name}</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:${p}%"></div></div>
+        <div class="prog-pct">${p}%</div></div>`;
+    });
+    h += `</div><div class="card"><h3>Par SKU</h3>`;
+    skus.forEach(s => {
+      const d = accs.filter(a=>isDone(s.id,a.id)).length;
+      const p = accs.length ? Math.round(d/accs.length*100) : 0;
+      h += `<div class="prog-row"><div class="prog-name">${s.name}</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:${p}%;background:${p===100?'#4a7c14':'#8bc34a'}"></div></div>
+        <div class="prog-pct">${d}/${accs.length}</div></div>`;
+    });
+    h += `</div>`;
+  }
+  h += `</div>`;
+  document.getElementById('v-dash').innerHTML = h;
+}
+
+// ── SETTINGS ──────────────────────────────────────────────────────────────────
+let _aEmps = [];   // selected emp ids for new account
+let _sEmps = 'all'; // 'all' or {id:true}
+let _bEmps = 'all'; // bulk target
+
+function saveInputs() {
+  return {
+    eN: (document.getElementById('eN')||{}).value||'',
+    aN: (document.getElementById('aN')||{}).value||'',
+    sN: (document.getElementById('sN')||{}).value||'',
+    sP: (document.getElementById('sP')||{}).value||'',
+    bulk: (document.getElementById('bulk')||{}).value||''
+  };
+}
+function restoreInputs(v) {
+  if(!v) return;
+  ['eN','aN','sN','sP','bulk'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el && v[id]) el.value = v[id];
+  });
+}
+
+function drawSettings() {
+  const emps = eArr(), accs = aArr(), skus = sArr();
+  let h = `<div class="hdr"><h1>Configuration</h1><p>Gérer les données</p></div><div class="ct">`;
+
+  // ── Employees
+  h += `<div class="card"><h3>Employées</h3>
+    <div class="row">
+      <input type="text" id="eN" placeholder="Prénom / nom" onkeydown="if(event.key==='Enter')saveEmp()">
+      <button class="btn g" onclick="saveEmp()">+ Ajouter</button>
+    </div>`;
+  emps.forEach(e => h += `<div class="li"><span>${e.name}</span><button class="del" onclick="rmEmp('${e.id}')">✕</button></div>`);
+  if (!emps.length) h += `<div style="color:#bbb;font-size:12px">Aucune employée.</div>`;
+  h += `</div>`;
+
+  // ── Accounts
+  h += `<div class="card"><h3>Comptes Vinted</h3>
+    <div class="row"><input type="text" id="aN" placeholder="Nom du compte (ex: vintage_rose)" onkeydown="if(event.key==='Enter')saveAcc()"></div>`;
+  if (emps.length) {
+    h += `<div class="lbl">Assigner à :</div><div class="tags">`;
+    emps.forEach(e => {
+      const on = _aEmps.includes(e.id);
+      h += `<span class="tag${on?' on':''}" onclick="togATag('${e.id}')">${on?'✓ ':''}${e.name}</span>`;
+    });
+    h += `</div>`;
+  }
+  h += `<div id="aErr" class="err-box red"></div>
+    <button class="btn g" onclick="saveAcc()" style="margin-bottom:10px">+ Ajouter ce compte</button>`;
+  accs.forEach(a => {
+    const linked = a.empIds ? Object.keys(a.empIds).map(eName).join(', ') : 'Non assigné';
+    h += `<div class="li"><div><div>${a.name}</div><div class="li-meta">→ ${linked}</div></div><button class="del" onclick="rmAcc('${a.id}')">✕</button></div>`;
+  });
+  if (!accs.length) h += `<div style="color:#bbb;font-size:12px">Aucun compte.</div>`;
+  h += `</div>`;
+
+  // ── SKUs
+  h += `<div class="card"><h3>SKUs</h3>
+    <div class="divider">
+      <div class="lbl" style="font-weight:600;text-transform:uppercase;letter-spacing:1px">Import liste</div>
+      <textarea class="ta" id="bulk" rows="4" placeholder="sz483748392948 59&#10;sz374829103847 35"></textarea>`;
+  if (emps.length) {
+    h += `<div class="lbl">Pour :</div><div class="tags">`;
+    const bAll = _bEmps === 'all';
+    h += `<span class="tag${bAll?' on':''}" onclick="bAll()">${bAll?'✓ ':''}Tout le monde</span>`;
+    emps.forEach(e => {
+      const on = !bAll && _bEmps[e.id];
+      h += `<span class="tag${on?' on':''}" onclick="togBTag('${e.id}')">${on?'✓ ':''}${e.name}</span>`;
+    });
+    h += `</div>`;
+  }
+  h += `<div id="bRes" class="err-box"></div>
+    <button class="btn g" onclick="importBulk()" style="margin-top:6px">⬆ Importer</button>
+    </div>
+    <div class="row">
+      <input type="text" id="sN" placeholder="Ou ajouter manuellement" onkeydown="if(event.key==='Enter')saveSku()">
+      <input type="text" id="sP" class="inp-sm" placeholder="Prix €" onkeydown="if(event.key==='Enter')saveSku()">
+    </div>`;
+  if (emps.length) {
+    h += `<div class="lbl">Pour :</div><div class="tags">`;
+    const sAll = _sEmps === 'all';
+    h += `<span class="tag${sAll?' on':''}" onclick="sAll()">${sAll?'✓ ':''}Tout le monde</span>`;
+    emps.forEach(e => {
+      const on = !sAll && _sEmps[e.id];
+      h += `<span class="tag${on?' on':''}" onclick="togSTag('${e.id}')">${on?'✓ ':''}${e.name}</span>`;
+    });
+    h += `</div>`;
+  }
+  h += `<div id="sErr" class="err-box red"></div>
+    <button class="btn g" onclick="saveSku()" style="margin:8px 0 10px">+ Ajouter ce SKU</button>`;
+  skus.forEach(s => {
+    const t = s.empIds==='all' ? 'Toutes' : (s.empIds?Object.keys(s.empIds).map(eName).join(', '):'?');
+    h += `<div class="li"><div>
+      <span>${s.name}</span>
+      ${s.price?`<span style="font-weight:700;color:#e53935;font-size:12px;margin-left:8px">${s.price} €</span>`:''}
+      <div class="li-meta">→ ${t}</div>
+    </div><button class="del" onclick="rmSku('${s.id}')">✕</button></div>`;
+  });
+  if (!skus.length) h += `<div style="color:#bbb;font-size:12px">Aucun SKU.</div>`;
+  h += `</div></div>`;
+
+  const _saved = saveInputs();
+  document.getElementById('v-settings').innerHTML = h;
+  restoreInputs(_saved);
+}
+
+// ── EMPLOYEES ─────────────────────────────────────────────────────────────────
+async function saveEmp() {
+  const inp = document.getElementById('eN');
+  const name = inp.value.trim(); if (!name) return;
+  const id = uid();
+  S.emps[id] = {name};
+  inp.value = '';
+  rebuildEmpSel(); drawSettings();
+  await SET('emps', S.emps);
+}
+async function rmEmp(id) {
+  delete S.emps[id];
+  rebuildEmpSel(); drawSettings();
+  await SET('emps', S.emps);
+}
+
+// ── ACCOUNTS ──────────────────────────────────────────────────────────────────
+function togATag(id) {
+  const i = _aEmps.indexOf(id);
+  if (i>=0) _aEmps.splice(i,1); else _aEmps.push(id);
+  drawSettings();
+}
+async function saveAcc() {
+  const inp = document.getElementById('aN');
+  const name = inp.value.trim();
+  const eBox = document.getElementById('aErr');
+  if (!name) { eBox.textContent='Entre un nom.'; eBox.style.display='block'; return; }
+  if (!_aEmps.length) { eBox.textContent='⚠️ Sélectionne au moins une employée.'; eBox.style.display='block'; return; }
+  eBox.style.display='none';
+  const id = uid();
+  const empIds = {};
+  _aEmps.forEach(eid => empIds[eid] = true);
+  S.accs[id] = {name, empIds};
+  inp.value = ''; _aEmps = [];
+  drawSettings();
+  await SET('accs', S.accs);
+}
+async function rmAcc(id) {
+  delete S.accs[id];
+  drawSettings();
+  await SET('accs', S.accs);
+}
+
+// ── SKUS ──────────────────────────────────────────────────────────────────────
+function fmtP(p) {
+  const n = parseFloat(p.replace(',','.'));
+  return isNaN(n) ? p : (Math.floor(n)+0.9).toFixed(2).replace('.',',');
+}
+function baseP(p) {
+  const n = parseFloat(p.replace(',','.'));
+  return isNaN(n) ? 0 : Math.floor(n)+0.9;
+}
+function sAll() { _sEmps='all'; drawSettings(); }
+function togSTag(id) {
+  if (_sEmps==='all') _sEmps={};
+  if (_sEmps[id]) delete _sEmps[id]; else _sEmps[id]=true;
+  if (!Object.keys(_sEmps).length) _sEmps='all';
+  drawSettings();
+}
+async function saveSku() {
+  const nI=document.getElementById('sN'), pI=document.getElementById('sP');
+  const name=nI.value.trim(), price=pI.value.trim();
+  const eBox=document.getElementById('sErr');
+  if (!name) { eBox.textContent='Entre un nom.'; eBox.style.display='block'; return; }
+  if (!price) { eBox.textContent='⚠️ Entre un prix.'; eBox.style.display='block'; return; }
+  eBox.style.display='none';
+  const id=uid();
+  const empIds = typeof _sEmps==='string' ? _sEmps : Object.assign({},_sEmps);
+  S.skus[id] = {name, price:fmtP(price), basePrice:baseP(price), empIds};
+  nI.value=''; pI.value=''; _sEmps='all';
+  drawSettings();
+  await SET('skus', S.skus);
+}
+async function rmSku(id) {
+  delete S.skus[id];
+  drawSettings();
+  await SET('skus', S.skus);
+}
+
+// ── BULK IMPORT ───────────────────────────────────────────────────────────────
+function bAll() { _bEmps='all'; drawSettings(); }
+function togBTag(id) {
+  if (_bEmps==='all') _bEmps={};
+  if (_bEmps[id]) delete _bEmps[id]; else _bEmps[id]=true;
+  if (!Object.keys(_bEmps).length) _bEmps='all';
+  drawSettings();
+}
+async function importBulk() {
+  const txt=(document.getElementById('bulk')||{}).value||'';
+  const lines=txt.split('\n').map(l=>l.trim()).filter(Boolean);
+  const rBox=document.getElementById('bRes');
+  if (!lines.length) {
+    rBox.textContent='⚠️ Colle ta liste.';rBox.className='err-box red';rBox.style.display='block';return;
+  }
+  const empIds = typeof _bEmps==='string' ? _bEmps : Object.assign({},_bEmps);
+  let added=0, bad=[];
+  lines.forEach(line => {
+    const parts=line.trim().split(/\s+/);
+    if (parts.length<2) { bad.push(line); return; }
+    const price=parts[parts.length-1];
+    const name=parts.slice(0,-1).join(' ');
+    const pn=parseFloat(price);
+    if (!name||isNaN(pn)) { bad.push(line); return; }
+    const id=uid();
+    S.skus[id]={name, price:fmtP(price), basePrice:baseP(price), empIds};
+    added++;
+  });
+  if (added) {
+    drawSettings();
+    await SET('skus', S.skus);
+    document.getElementById('bulk').value='';
+  }
+  const msg=added?`✓ ${added} SKU${added>1?'s':''} ajouté${added>1?'s':''}${bad.length?' · '+bad.length+' ignorée(s)':''}`:' Aucun SKU valide.';
+  rBox.textContent=msg;
+  rBox.className='err-box '+(added?'green':'red');
+  rBox.style.display='block';
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────────────
+(async function() {
+  await sync();
+  setInterval(sync, 6000);
+  document.getElementById('loading').style.display='none';
+  document.getElementById('app').style.display='flex';
+})();
+</script>
+</body>
+</html>
