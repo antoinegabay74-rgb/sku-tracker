@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SKU Tracker</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f5;color:#1a1a1a;font-size:14px}
+.app{display:flex;min-height:100vh}
+.sb{width:190px;min-width:190px;background:#fff;border-right:1px solid #e0e0e0;display:flex;flex-direction:column;padding:16px 0;position:sticky;top:0;height:100vh}
+.logo{padding:0 14px 18px;font-size:14px;font-weight:700;color:#4a7c14}
+.logo span{display:block;font-size:10px;font-weight:400;color:#999;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px}
+.nb{width:100%;padding:8px 10px;border:none;background:none;cursor:pointer;font-family:inherit;font-size:13px;color:#777;text-align:left;border-radius:7px;transition:all .1s;display:block}
+.nb:hover{background:#f5f5f5;color:#333}
+.nb.on{background:#eef5e6;color:#4a7c14;font-weight:600}
+.sbm{padding:0 8px}
+.empsec{margin-top:auto;padding:12px 10px;border-top:1px solid #eee}
+.empsec label{display:block;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin-bottom:5px}
+select{width:100%;padding:7px 8px;border:1px solid #ddd;border-radius:7px;font-family:inherit;font-size:12px;background:#f9f9f9;outline:none;cursor:pointer}
+select:focus{border-color:#4a7c14}
+.main{flex:1;overflow:auto}
+.hdr{padding:18px 22px 13px;border-bottom:1px solid #eee;background:#fff;position:sticky;top:0;z-index:9}
+.hdr h1{font-size:16px;font-weight:700}
+.hdr p{font-size:12px;color:#888;margin-top:2px}
+.ct{padding:20px 22px}
+.warn{background:#fff8e1;border:1px solid #ffcc02;border-radius:8px;padding:9px 13px;margin-bottom:14px;font-size:12px;color:#7a5f00}
+.twrap{overflow-x:auto;border-radius:9px;border:1px solid #bbb;background:#fff}
+table{border-collapse:collapse;width:100%}
+th{background:#f0f0f0;color:#666;font-size:10px;letter-spacing:.8px;text-transform:uppercase;padding:9px 11px;text-align:left;border-bottom:2px solid #bbb;white-space:nowrap;font-weight:600}
+th.ac{text-align:center;min-width:90px}
+td{border-bottom:1px solid #d0d0d0;border-right:1px solid #d0d0d0;padding:0;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+.sc{padding:10px 11px;background:#fafafa;min-width:160px}
+.sn{font-weight:600;font-size:12px}
+.sp{font-size:14px;font-weight:700;color:#e53935;margin-top:2px}
+.st{font-size:9px;color:#aaa;margin-top:1px}
+.cb{width:100%;height:44px;border:none;cursor:pointer;background:transparent;font-size:18px;transition:background .1s;display:flex;align-items:center;justify-content:center;color:#ddd}
+.cb.done{background:#eef5e6;color:#4a7c14}
+.cb.done:hover{background:#dff0cb}
+.cb.todo:hover{background:#f5f5f5;color:#aaa}
+.na{width:100%;height:44px;display:flex;align-items:center;justify-content:center;color:#ddd;font-size:12px;background:#fafafa}
+.stats{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.stat{background:#fff;border:1px solid #e0e0e0;border-radius:9px;padding:12px 16px;flex:1;min-width:100px}
+.sv{font-size:26px;font-weight:700;color:#4a7c14}
+.sl{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#999;margin-top:1px}
+.pr{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.pn{font-size:12px;width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.pb{flex:1;height:6px;background:#eee;border-radius:99px;overflow:hidden}
+.pf{height:100%;background:#4a7c14;border-radius:99px;transition:width .3s}
+.pp{font-size:10px;color:#aaa;width:34px;text-align:right}
+.card{background:#fff;border:1px solid #e0e0e0;border-radius:9px;padding:17px;margin-bottom:13px}
+.card h3{font-size:13px;font-weight:700;margin-bottom:12px}
+.row{display:flex;gap:8px;margin-bottom:9px;flex-wrap:wrap}
+.inp{padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-family:inherit;font-size:12px;background:#f9f9f9;outline:none;color:#1a1a1a;flex:1;min-width:80px}
+.inp:focus{border-color:#4a7c14}
+.inp-sm{width:80px;flex:none}
+.ta{padding:8px 10px;border:1px solid #ddd;border-radius:7px;font-family:inherit;font-size:12px;background:#f9f9f9;outline:none;color:#1a1a1a;width:100%;resize:vertical;margin-bottom:8px}
+.ta:focus{border-color:#4a7c14}
+.btn{padding:8px 13px;border:1px solid #ddd;border-radius:7px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;background:#f5f5f5;color:#333;transition:all .1s;white-space:nowrap}
+.btn:hover{border-color:#4a7c14;color:#4a7c14}
+.btn.g{background:#4a7c14;color:#fff;border-color:#4a7c14}
+.btn.g:hover{background:#3a6010}
+.li{display:flex;align-items:flex-start;justify-content:space-between;padding:7px 9px;background:#f9f9f9;border-radius:6px;margin-bottom:5px;font-size:12px}
+.lim{font-size:10px;color:#aaa;margin-top:2px}
+.del{padding:4px 7px;background:none;border:1px solid #ddd;border-radius:5px;cursor:pointer;font-size:12px;color:#aaa;transition:all .1s;margin-left:8px;flex-shrink:0}
+.del:hover{border-color:#e91e63;color:#e91e63}
+.tag{display:inline-flex;padding:3px 9px;border-radius:99px;font-size:11px;margin:2px;cursor:pointer;border:1px solid #ddd;background:#f5f5f5;color:#888;transition:all .1s;user-select:none}
+.tag:hover{border-color:#4a7c14;color:#4a7c14}
+.tag.on{background:#eef5e6;border-color:#4a7c14;color:#4a7c14}
+.tags{display:flex;flex-wrap:wrap;margin:4px 0 8px}
+.lbl{font-size:11px;color:#aaa;margin-bottom:2px;margin-top:6px}
+.ebox{display:none;font-size:12px;padding:7px 10px;border-radius:6px;margin:6px 0}
+.ebox.r{background:#fdecea;color:#c0392b}
+.ebox.gr{background:#e8f5e9;color:#2e7d32}
+.empty{text-align:center;padding:50px;color:#bbb;font-size:13px}
+.div{border-bottom:1px solid #eee;margin-bottom:14px;padding-bottom:14px}
+</style>
+</head>
+<body>
+<div class="app" id="app" style="display:none">
+  <aside class="sb">
+    <div class="logo">SKU Tracker<span>Vintage</span></div>
+    <div class="sbm">
+      <button class="nb on" id="n-t" onclick="go('t')">◫ &nbsp;Tracker</button>
+      <button class="nb" id="n-d" onclick="go('d')">▦ &nbsp;Tableau de bord</button>
+      <button class="nb" id="n-s" onclick="go('s')">⚙ &nbsp;Configuration</button>
+    </div>
+    <div class="empsec">
+      <label>Employée active</label>
+      <select id="esel" onchange="pickE(this.value)"></select>
+    </div>
+  </aside>
+  <main class="main">
+    <div id="v-t"></div>
+    <div id="v-d" style="display:none"></div>
+    <div id="v-s" style="display:none"></div>
+  </main>
+</div>
+<div id="ld" style="display:flex;align-items:center;justify-content:center;height:100vh;font-size:14px;color:#999">Connexion…</div>
+
+<script>
+const DB='https://vinted-9aa6a-default-rtdb.europe-west1.firebasedatabase.app';
+let S={emps:{},accs:{},skus:{},prog:{}};
+let curE='',curTab='t';
+
+// Firebase
+async function GET(p){try{const r=await fetch(DB+'/'+p+'.json');if(!r.ok)return null;return await r.json();}catch{return null;}}
+async function PUT(p,v){try{await fetch(DB+'/'+p+'.json',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)});}catch{}}
+async function PATCH(p,v){try{await fetch(DB+'/'+p+'.json',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)});}catch{}}
+
+// Sync
+async function sync(){
+  const[e,a,s,p]=await Promise.all([GET('emps'),GET('accs'),GET('skus'),GET('prog')]);
+  if(e!==null)S.emps=e||{};
+  if(a!==null)S.accs=a||{};
+  if(s!==null)S.skus=s||{};
+  if(p!==null)S.prog=p||{};
+  buildEsel();
+  if(curTab!=='s')draw();
+}
+
+// Helpers
+const uid=()=>'_'+Math.random().toString(36).slice(2,9);
+const esc=s=>String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+const eName=id=>S.emps[id]?S.emps[id].name:'?';
+const eArr=()=>Object.entries(S.emps).map(([id,v])=>({id,name:v.name||v}));
+const aArr=()=>Object.entries(S.accs).map(([id,v])=>({id,name:v.name||v,empIds:v.empIds||{}}));
+const sArr=()=>Object.entries(S.skus).map(([id,v])=>({id,...v}));
+
+function myAccs(){
+  if(!curE)return aArr();
+  return aArr().filter(a=>a.empIds&&a.empIds[curE]);
+}
+function mySkus(){
+  if(!curE)return sArr();
+  return sArr().filter(s=>!s.empIds||s.empIds==='all'||(s.empIds&&s.empIds[curE]));
+}
+function skuActiveOnAcc(s,accId){
+  return !s.accIds||s.accIds==='all'||(s.accIds&&s.accIds[accId]);
+}
+function calcP(s){
+  if(!s.basePrice||!curE)return s.price||'';
+  const n=eName(curE).toLowerCase();
+  let p=parseFloat(s.basePrice);
+  if(n.includes('inha'))p+=1;
+  else if(n.includes('haingotiana'))p-=1;
+  return p.toFixed(2).replace('.',',');
+}
+function isDone(sid,aid){return !!(S.prog[sid+'__'+aid+'__'+(curE||'x')]);}
+
+// Emp selector
+function buildEsel(){
+  const sel=document.getElementById('esel');
+  if(!sel)return;
+  const prev=curE,arr=eArr();
+  sel.innerHTML='';
+  if(!arr.length){sel.innerHTML='<option value="">— Aucune —</option>';curE='';return;}
+  arr.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.name;sel.appendChild(o);});
+  if(prev&&S.emps[prev]){sel.value=prev;curE=prev;}
+  else{curE=arr[0].id;sel.value=curE;}
+}
+function pickE(id){curE=id;draw();}
+
+// Nav
+function go(t){
+  curTab=t;
+  ['t','d','s'].forEach(x=>{
+    document.getElementById('v-'+x).style.display=x===t?'block':'none';
+    document.getElementById('n-'+x).className='nb'+(x===t?' on':'');
+  });
+  draw();
+}
+function draw(){
+  if(curTab==='t')drawT();
+  else if(curTab==='d')drawD();
+  else drawS();
+}
+
+// TRACKER
+function drawT(){
+  const accs=myAccs(),skus=mySkus();
+  const en=curE?eName(curE):null;
+  let h=`<div class="hdr"><h1>Tracker SKU</h1><p>${skus.length} SKU · ${accs.length} compte${accs.length!==1?'s':''}${en?' · '+en:' · Sélectionne une employée'}</p></div><div class="ct">`;
+  if(!curE)h+=`<div class="warn">⚠️ Sélectionne une employée dans la barre de gauche.</div>`;
+  if(curE&&!accs.length)h+=`<div class="warn">⚠️ Aucun compte associé à cette employée. Va dans Configuration.</div>`;
+  if(!skus.length||!accs.length){
+    h+=`<div class="empty">Ajoute des SKUs et des comptes dans Configuration.</div>`;
+  }else{
+    h+=`<div class="twrap"><table><thead><tr><th>SKU / Article</th>`;
+    accs.forEach(a=>h+=`<th class="ac">${a.name}</th>`);
+    h+=`</tr></thead><tbody>`;
+    skus.forEach(s=>{
+      h+=`<tr><td><div class="sc"><div class="sn">${s.name}</div><div class="sp" onclick="editPrice('${s.id}')" title="Cliquer pour modifier le prix" style="cursor:pointer">${calcP(s)} € ✏️</div><div class="st">${!s.empIds||s.empIds==='all'?'Toutes':'Ciblé'}</div></div></td>`;
+      accs.forEach(a=>{
+        if(skuActiveOnAcc(s,a.id)){
+          const done=isDone(s.id,a.id);
+          h+=`<td><button class="cb ${done?'done':'todo'}" onclick="tick('${s.id}','${a.id}')">${done?'✓':'·'}</button></td>`;
+        }else{
+          h+=`<td style="background:#f0f0f0"><div class="na" style="color:#aaa;font-size:16px;font-weight:700">—</div></td>`;
+        }
+      });
+      h+=`</tr>`;
+    });
+    h+=`</tbody></table></div>`;
+  }
+  h+=`</div>`;
+  document.getElementById('v-t').innerHTML=h;
+}
+async function tick(sid,aid){
+  const k=sid+'__'+aid+'__'+(curE||'x');
+  const v=!isDone(sid,aid);
+  S.prog[k]=v;
+  drawT();
+  await PATCH('prog',{[k]:v});
+}
+
+// DASHBOARD
+function drawD(){
+  const accs=myAccs(),skus=mySkus();
+  const tot=skus.reduce((n,s)=>n+accs.filter(a=>skuActiveOnAcc(s,a.id)).length,0);
+  const done=skus.reduce((n,s)=>n+accs.filter(a=>skuActiveOnAcc(s,a.id)&&isDone(s.id,a.id)).length,0);
+  const pct=tot?Math.round(done/tot*100):0;
+  let h=`<div class="hdr"><h1>Tableau de bord</h1><p>Avancement</p></div><div class="ct">
+    <div class="stats">
+      <div class="stat"><div class="sv">${done}</div><div class="sl">Publiés</div></div>
+      <div class="stat"><div class="sv">${tot-done}</div><div class="sl">Restants</div></div>
+      <div class="stat"><div class="sv">${pct}%</div><div class="sl">Complété</div></div>
+    </div>`;
+  if(accs.length&&skus.length){
+    h+=`<div class="card"><h3>Par compte</h3>`;
+    accs.forEach(a=>{
+      const actSkus=skus.filter(s=>skuActiveOnAcc(s,a.id));
+      const d=actSkus.filter(s=>isDone(s.id,a.id)).length;
+      const p=actSkus.length?Math.round(d/actSkus.length*100):0;
+      h+=`<div class="pr"><div class="pn">${a.name}</div><div class="pb"><div class="pf" style="width:${p}%"></div></div><div class="pp">${p}%</div></div>`;
+    });
+    h+=`</div><div class="card"><h3>Par SKU</h3>`;
+    skus.forEach(s=>{
+      const actAccs=accs.filter(a=>skuActiveOnAcc(s,a.id));
+      const d=actAccs.filter(a=>isDone(s.id,a.id)).length;
+      const p=actAccs.length?Math.round(d/actAccs.length*100):0;
+      h+=`<div class="pr"><div class="pn">${s.name}</div><div class="pb"><div class="pf" style="width:${p}%;background:${p===100?'#4a7c14':'#8bc34a'}"></div></div><div class="pp">${d}/${actAccs.length}</div></div>`;
+    });
+    h+=`</div>`;
+  }
+  h+=`</div>`;
+  document.getElementById('v-d').innerHTML=h;
+}
+
+// SETTINGS state
+let _aE=[]; // account -> emp ids
+let _sE='all'; // sku -> emp
+let _sA='all'; // sku -> acc
+let _bE='all'; // bulk -> emp
+
+function saveInps(){
+  return{
+    eN:(document.getElementById('eN')||{}).value||'',
+    aN:(document.getElementById('aN')||{}).value||'',
+    sN:(document.getElementById('sN')||{}).value||'',
+    sP:(document.getElementById('sP')||{}).value||'',
+    bulk:(document.getElementById('bulk')||{}).value||''
+  };
+}
+function restInps(v){
+  if(!v)return;
+  ['eN','aN','sN','sP','bulk'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el&&v[id])el.value=v[id];
+  });
+}
+
+// SETTINGS
+function drawS(){
+  const saved=saveInps();
+  const emps=eArr(),accs=aArr(),skus=sArr();
+  const aName=id=>(S.accs[id]?(S.accs[id].name||S.accs[id]):'?');
+  let h=`<div class="hdr"><h1>Configuration</h1><p>Gérer les données</p></div><div class="ct">`;
+
+  // Employees
+  h+=`<div class="card"><h3>Employées</h3><div class="row">
+    <input class="inp" id="eN" placeholder="Prénom / nom" onkeydown="if(event.key==='Enter')saveE()">
+    <button class="btn g" onclick="saveE()">+ Ajouter</button></div>`;
+  emps.forEach(e=>h+=`<div class="li"><span>${e.name}</span><button class="del" onclick="delE('${e.id}')">✕</button></div>`);
+  if(!emps.length)h+=`<div style="color:#bbb;font-size:12px">Aucune employée.</div>`;
+  h+=`</div>`;
+
+  // Accounts
+  h+=`<div class="card"><h3>Comptes Vinted</h3><div class="row">
+    <input class="inp" id="aN" placeholder="Nom du compte (ex: vintage_rose)" onkeydown="if(event.key==='Enter')saveA()">
+    </div>`;
+  if(emps.length){
+    h+=`<div class="lbl">Assigner à :</div><div class="tags">`;
+    emps.forEach(e=>{
+      const on=_aE.includes(e.id);
+      h+=`<span class="tag${on?' on':''}" onclick="togAE('${e.id}')">${on?'✓ ':''}${e.name}</span>`;
+    });
+    h+=`</div>`;
+  }
+  h+=`<div id="aErr" class="ebox r"></div>
+    <button class="btn g" onclick="saveA()" style="margin-bottom:10px">+ Ajouter ce compte</button>`;
+  accs.forEach(a=>{
+    const linked=a.empIds&&Object.keys(a.empIds).length?Object.keys(a.empIds).map(eName).join(', '):'Non assigné';
+    const safeName=esc(a.name);
+    h+=`<div class="li"><div><div>${a.name}</div><div class="lim">→ ${linked}</div></div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button onclick="exportAcc('${a.id}','${safeName}')" style="padding:4px 9px;background:#eef5e6;border:1px solid #4a7c14;color:#4a7c14;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600">⬇ Export</button>
+      <button onclick="resetAcc('${a.id}','${safeName}')" style="padding:4px 9px;background:#fff8e1;border:1px solid #ffcc02;color:#7a5f00;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600">↺ Reset</button>
+      <button class="del" onclick="delA('${a.id}')">✕</button>
+    </div></div>`;
+  });
+  if(!accs.length)h+=`<div style="color:#bbb;font-size:12px">Aucun compte.</div>`;
+  h+=`</div>`;
+
+  // SKUs
+  h+=`<div class="card"><h3>SKUs</h3>
+    <div class="div">
+      <div class="lbl" style="font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#555">Import liste</div>
+      <textarea class="ta" id="bulk" rows="4" placeholder="sz483748392948 59&#10;sz374829103847 35"></textarea>
+      <div class="lbl">Pour (employées) :</div><div class="tags">`;
+  const bAll=_bE==='all';
+  h+=`<span class="tag${bAll?' on':''}" onclick="bAll()">${bAll?'✓ ':''}Tout le monde</span>`;
+  emps.forEach(e=>{const on=!bAll&&_bE[e.id];h+=`<span class="tag${on?' on':''}" onclick="togBE('${e.id}')">${on?'✓ ':''}${e.name}</span>`;});
+  h+=`</div><div id="bRes" class="ebox"></div>
+      <button class="btn g" onclick="importB()" style="margin-top:4px">⬆ Importer</button>
+    </div>
+`;
+
+  // Emp tags for bulk
+  h+=`<div class="lbl">Employées :</div><div class="tags">`;
+  const sEAll=_sE==='all';
+  h+=`<span class="tag${sEAll?' on':''}" onclick="sEAll()">${sEAll?'✓ ':''}Toutes</span>`;
+  emps.forEach(e=>{const on=!sEAll&&_sE[e.id];h+=`<span class="tag${on?' on':''}" onclick="togSE('${e.id}')">${on?'✓ ':''}${e.name}</span>`;});
+  h+=`</div>`;
+
+  // Acc tags - filter by selected employees
+  const sEAll2=_sE==='all';
+  const filteredAccs=sEAll2?accs:accs.filter(a=>a.empIds&&Object.keys(a.empIds).some(eid=>_sE[eid]));
+  h+=`<div class="lbl">Comptes :</div><div class="tags">`;
+  const sAAll=_sA==='all';
+  h+=`<span class="tag${sAAll?' on':''}" onclick="sAAll()">${sAAll?'✓ ':''}Tous</span>`;
+  filteredAccs.forEach(a=>{const on=!sAAll&&_sA[a.id];h+=`<span class="tag${on?' on':''}" onclick="togSA('${a.id}')">${on?'✓ ':''}${a.name}</span>`;});
+  h+=`</div>`;
+
+  skus.forEach(s=>{
+    const te=!s.empIds||s.empIds==='all'?'Toutes':(s.empIds?Object.keys(s.empIds).map(eName).join(', '):'?');
+    const ta=!s.accIds||s.accIds==='all'?'Tous les comptes':(s.accIds?Object.keys(s.accIds).map(aName).join(', '):'?');
+    h+=`<div class="li"><div style="flex:1;min-width:0">
+      <span>${s.name}</span>
+      <span id="price_${s.id}" style="font-weight:700;color:#e53935;font-size:12px;margin-left:8px">${s.price||''} €</span>
+      <div class="lim">👤 ${te}</div>
+      <div class="lim">🏪 ${ta}</div>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+      <button onclick="editPrice('${s.id}')" style="padding:4px 9px;background:#fff8e1;border:1px solid #ffcc02;color:#7a5f00;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600">✏️ Prix</button>
+      <button class="del" onclick="delS('${s.id}')">✕</button>
+    </div></div>`;
+  });
+  if(!skus.length)h+=`<div style="color:#bbb;font-size:12px">Aucun SKU.</div>`;
+  h+=`</div></div>`;
+
+  document.getElementById('v-s').innerHTML=h;
+  restInps(saved);
+}
+
+// Employees
+async function saveE(){
+  const el=document.getElementById('eN');
+  const name=el.value.trim();if(!name)return;
+  const id=uid();S.emps[id]={name};
+  el.value='';buildEsel();drawS();
+  await PUT('emps',S.emps);
+}
+async function delE(id){
+  delete S.emps[id];buildEsel();drawS();
+  await PUT('emps',S.emps);
+}
+
+// Accounts
+function togAE(id){const i=_aE.indexOf(id);if(i>=0)_aE.splice(i,1);else _aE.push(id);drawS();}
+async function saveA(){
+  const el=document.getElementById('aN');
+  const name=el.value.trim();
+  const err=document.getElementById('aErr');
+  if(!name){err.textContent='Entre un nom.';err.style.display='block';return;}
+  if(!_aE.length){err.textContent='⚠️ Sélectionne au moins une employée.';err.style.display='block';return;}
+  err.style.display='none';
+  const id=uid();const empIds={};_aE.forEach(e=>empIds[e]=true);
+  S.accs[id]={name,empIds};
+  el.value='';_aE=[];drawS();
+  await PUT('accs',S.accs);
+}
+async function delA(id){delete S.accs[id];drawS();await PUT('accs',S.accs);}
+
+// SKU helpers
+function fmtP(p){const n=parseFloat(p.replace(',','.'));return isNaN(n)?p:(Math.floor(n)+0.9).toFixed(2).replace('.',',');}
+function baseP(p){const n=parseFloat(p.replace(',','.'));return isNaN(n)?0:Math.floor(n)+0.9;}
+function sEAll(){_sE='all';drawS();}
+function togSE(id){if(_sE==='all')_sE={};if(_sE[id])delete _sE[id];else _sE[id]=true;if(!Object.keys(_sE).length)_sE='all';drawS();}
+function sAAll(){_sA='all';drawS();}
+function togSA(id){if(_sA==='all')_sA={};if(_sA[id])delete _sA[id];else _sA[id]=true;if(!Object.keys(_sA).length)_sA='all';drawS();}
+
+async function saveS(){
+  const nI=document.getElementById('sN'),pI=document.getElementById('sP');
+  const name=nI.value.trim(),price=pI.value.trim();
+  const err=document.getElementById('sErr');
+  if(!name){err.textContent='Entre un nom.';err.style.display='block';return;}
+  if(!price){err.textContent='⚠️ Entre un prix.';err.style.display='block';return;}
+  err.style.display='none';
+  const id=uid();
+  const empIds=typeof _sE==='string'?_sE:Object.assign({},_sE);
+  const accIds=typeof _sA==='string'?_sA:Object.assign({},_sA);
+  S.skus[id]={name,price:fmtP(price),basePrice:baseP(price),empIds,accIds};
+  nI.value='';pI.value='';_sE='all';_sA='all';drawS();
+  await PUT('skus',S.skus);
+}
+async function delS(id){delete S.skus[id];drawS();await PUT('skus',S.skus);}
+
+// Bulk
+function bAll(){_bE='all';drawS();}
+function togBE(id){if(_bE==='all')_bE={};if(_bE[id])delete _bE[id];else _bE[id]=true;if(!Object.keys(_bE).length)_bE='all';drawS();}
+async function importB(){
+  const txt=(document.getElementById('bulk')||{}).value||'';
+  const lines=txt.split('\n').map(l=>l.trim()).filter(Boolean);
+  const res=document.getElementById('bRes');
+  if(!lines.length){res.textContent='⚠️ Colle ta liste.';res.className='ebox r';res.style.display='block';return;}
+  const empIds=typeof _sE==='string'?_sE:Object.assign({},_sE);
+  let added=0,bad=[];
+  lines.forEach(line=>{
+    const parts=line.trim().split(/\s+/);
+    if(parts.length<2){bad.push(line);return;}
+    const price=parts[parts.length-1];
+    const name=parts.slice(0,-1).join(' ');
+    const pn=parseFloat(price);
+    if(!name||isNaN(pn)){bad.push(line);return;}
+    const accIds2=typeof _sA==='string'?_sA:Object.assign({},_sA);
+    S.skus[uid()]={name,price:fmtP(price),basePrice:baseP(price),empIds,accIds:accIds2};
+    added++;
+  });
+  if(added){drawS();await PUT('skus',S.skus);document.getElementById('bulk').value='';}
+  const msg=added?`✓ ${added} SKU${added>1?'s':''} ajouté${added>1?'s':''}${bad.length?' · '+bad.length+' ignorée(s)':''}`:' Aucun SKU valide.';
+  res.textContent=msg;res.className='ebox '+(added?'gr':'r');res.style.display='block';
+}
+
+// Reset all checks for an account
+async function resetAcc(accId, accName) {
+  if (!confirm('Remettre à zéro toutes les coches du compte "' + accName + '" ?')) return;
+  const keys = Object.keys(S.prog).filter(k => k.includes('__'+accId+'__'));
+  keys.forEach(k => delete S.prog[k]);
+  await PUT('prog', S.prog);
+  draw();
+}
+
+// Edit price of a SKU
+async function editPrice(id) {
+  const s = S.skus[id];
+  if (!s) return;
+  const newPrice = prompt('Nouveau prix pour "' + s.name + '" :', s.price||'');
+  if (newPrice === null) return;
+  const p = newPrice.trim();
+  if (!p) return;
+  const n = parseFloat(p.replace(',','.'));
+  const formatted = isNaN(n) ? p : (Math.floor(n)+0.9).toFixed(2).replace('.',',');
+  S.skus[id].price = formatted;
+  S.skus[id].basePrice = isNaN(n) ? s.basePrice : Math.floor(n)+0.9;
+  drawS();
+  await PUT('skus', S.skus);
+}
+
+// Export SKUs for an account
+function exportAcc(accId, accName) {
+  const skus = sArr();
+  const accSkus = skus.filter(s => !s.accIds || s.accIds==='all' || (s.accIds && s.accIds[accId]));
+  if (!accSkus.length) { alert('Aucun SKU assigne a ce compte.'); return; }
+  const lignes = accSkus.map(s => s.name + ' - ' + s.price + ' EUR').join('\n');
+  const txt = 'SKUs pour ' + accName + '\n' + '='.repeat(30) + '\n' + lignes;
+  const blob = new Blob([txt], {type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'SKU_' + accName + '.txt';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// Boot
+(async()=>{
+  await sync();
+  setInterval(sync,6000);
+  document.getElementById('ld').style.display='none';
+  document.getElementById('app').style.display='flex';
+})();
+</script>
+</body>
+</html>
