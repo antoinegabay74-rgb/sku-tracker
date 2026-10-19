@@ -256,6 +256,17 @@ textarea.inp{resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;f
 .p-ctag i{width:9px;height:9px;border-radius:3px;display:inline-block}
 .p-ctag[aria-pressed="true"]{color:#1a1a1a;border-color:#1a1a1a;background:#f3f3f3}
 .p-total{font-size:13px;font-weight:700;color:#4a7c14}
+.p-jour{display:inline-block;margin-left:8px;font-size:11px;font-weight:800;color:#1e6fd9;background:#e6f0fd;border-radius:99px;padding:2px 8px;vertical-align:middle}
+.p-ccard{border:1px solid #e6e8e1;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:9px;background:#fbfcf9}
+.p-modes{display:flex;gap:5px}
+.p-ph{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-left:22px}
+.p-step{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#4a7c14;min-width:58px}
+.p-pat{flex:0 1 150px!important;width:150px!important;font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700}
+.p-prev{display:flex;flex-wrap:wrap;gap:4px;padding-left:22px}
+.p-pv{display:flex;flex-direction:column;align-items:center;min-width:30px;padding:3px 4px;border-radius:7px;background:#fff;border:1px solid #e6e8e1;font-weight:800;font-size:12px;font-variant-numeric:tabular-nums}
+.p-pv small{font-size:9px;color:#999;font-weight:700}
+.p-startbox{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto}
+.p-date{border:1px solid #ddd;border-radius:8px;padding:5px 7px;font:inherit;font-size:12px}
 </style>
 </head>
 <body>
@@ -424,7 +435,7 @@ function addAccBar(){
     const add={};let dup=0;names.forEach(n=>{if(exist.has(n.toLowerCase())){dup++;return;}exist.add(n.toLowerCase());const id=uid();add[id]={name:n,empIds};S.accs[id]=add[id];});
     const k=Object.keys(add).length;
     if(k)W(()=>PATCH('accs',add));
-    toast(k?(k>1?k+' comptes ajoutés':'Compte « '+Object.values(add)[0].name+' » ajouté')+(dup?' · '+dup+' déjà existant(s)':''):'Ce compte existe déjà');
+    toast(k?(k>1?k+' comptes ajoutés':'Compte « '+Object.values(add)[0].name+' » ajouté')+(dup?' · '+dup+' déjà existant(s), pas ajouté(s)':''):'⚠️ Pas possible : ce compte existe déjà');
     i.value='';_focusId='a-new';_focusPos=0;drawA();
   };
   i.addEventListener('keydown',e=>{if(e.key==='Enter')go2();});
@@ -572,7 +583,7 @@ function importB(){
   if(n){$('#bulk').value='';W(()=>PATCH('skus',add));}
   drawS();
 }
-function addAcc(){const i=$('#newacc');const name=i.value.trim();if(!name){i.focus();return;}const id=uid();const empIds={};Object.keys(S.emps||{}).forEach(k=>empIds[k]=true);S.accs[id]={name,empIds};i.value='';W(()=>PUT('accs/'+id,S.accs[id]));toast('Compte « '+name+' » ajouté');drawS();}
+function addAcc(){const i=$('#newacc');const name=i.value.trim();if(!name){i.focus();return;}if(accExists(name)){toast('⚠️ Le compte « '+name+' » existe déjà');i.select();return;}const id=uid();const empIds={};Object.keys(S.emps||{}).forEach(k=>empIds[k]=true);S.accs[id]={name,empIds};i.value='';W(()=>PUT('accs/'+id,S.accs[id]));toast('Compte « '+name+' » ajouté');drawS();}
 function delAcc(a){delete S.accs[a.id];accDel=null;W(()=>PUT('accs/'+a.id,null));toast('Compte supprimé');drawS();}
 function resetAcc(a){const ch={},tc={};Object.keys(S.prog).forEach(k=>{if(k.split('__')[1]===a.id){ch[k]=null;delete S.prog[k];}});Object.keys(S.ts).forEach(k=>{if(k.split('__')[1]===a.id){tc[k]=null;delete S.ts[k];}});accReset=null;buildDone();W(async()=>{if(Object.keys(ch).length)await PATCH('prog',ch);if(Object.keys(tc).length)await PATCH('ts',tc);});toast('Coches de « '+a.name+' » remises à zéro');drawS();}
 function delSku(id){delete S.skus[id];skuDel=null;W(()=>PUT('skus/'+id,null));toast('SKU supprimé');drawS();}
@@ -711,19 +722,30 @@ $('#m-rform').addEventListener('submit',e=>{
 const COLORS=['#e53935','#fb8c00','#fdd835','#43a047','#1e88e5','#8e24aa','#00897b','#6d4c41'];
 let pSetOpen=false,pEdit=null,pNewColor=COLORS[3],pConfirmCat=null;
 const cArr=()=>Object.entries(S.pubCats||{}).filter(([,v])=>v&&typeof v==='object').map(([id,v])=>({id,...v})).sort((a,b)=>(a.order||0)-(b.order||0));
-const accList=()=>Object.entries(S.accs||{}).map(([id,v])=>({id,name:(v&&v.name)||String(v),cat:(v&&v.cat)||null})).sort((a,b)=>a.name.localeCompare(b.name,'fr',{numeric:true}));
+const accList=()=>Object.entries(S.accs||{}).map(([id,v])=>({id,name:(v&&v.name)||String(v),cat:(v&&v.cat)||null,start:(v&&v.catStart)||null})).sort((a,b)=>a.name.localeCompare(b.name,'fr',{numeric:true}));
 const tgt=c=>Math.max(0,parseInt(c&&c.target,10)||0);
+// ---- programmes (cycles)
+const isProg=c=>c&&c.mode==='prog';
+const parsePat=s=>{const a=String(s==null?'':s).split(/[^0-9]+/).filter(Boolean).map(n=>Math.min(999,parseInt(n,10)));return a.length?a:[0];};
+const phasesOf=c=>(Array.isArray(c.phases)?c.phases:Object.values(c.phases||{})).filter(Boolean).map(p=>({days:Math.max(1,parseInt(p.days,10)||1),pattern:parsePat(p.pattern).join(',')}));
+const dateOf=k=>{const[a,m,d]=String(k).split('-').map(Number);return new Date(a,(m||1)-1,d||1);};
+const dayNum=(start,day)=>Math.round((dateOf(day)-dateOf(start))/86400000)+1; // jour 1 = jour de départ
+function progTarget(c,n){if(n<1)return 0;let d=n-1;for(const p of phasesOf(c)){if(d<p.days){const pat=parsePat(p.pattern);return pat[d%pat.length];}d-=p.days;}return tgt(c);}
+function goalFor(a,c,day){if(!c)return 0;if(!isProg(c))return tgt(c);return progTarget(c,dayNum(a.start||day,day));}
+function progLabel(c){const ph=phasesOf(c);return ph.map(p=>p.pattern.replace(/,/g,'-')+' pendant '+p.days+' j').join(' → ')+(ph.length?' → ':'')+'puis '+tgt(c)+' / jour';}
+function accExists(name,exceptId){const n=String(name).trim().toLowerCase();return Object.entries(S.accs||{}).some(([id,v])=>id!==exceptId&&String((v&&v.name)||v).trim().toLowerCase()===n);}
+
 function dayLabel(k){
   const t=dayKey();if(k===t)return'Aujourd\'hui';
   const y=new Date();y.setDate(y.getDate()-1);if(k===dayKey(y))return'Hier';
-  const[a,m,d]=k.split('-').map(Number);return new Date(a,m-1,d).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
+  return dateOf(k).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
 }
-function shiftDay(n){const[a,m,d]=pDay.split('-').map(Number);const x=new Date(a,m-1,d+n);const k=dayKey(x);if(k>dayKey())return;pDay=k;pFollow=(k===dayKey());S.pubLog={};pDraw();GET('pubLog/'+k).then(v=>{if(pDay===k&&v!==null){S.pubLog=v||{};pDraw();}});}
+function shiftDay(n){const x=dateOf(pDay);x.setDate(x.getDate()+n);const k=dayKey(x);if(k>dayKey())return;pDay=k;pFollow=(k===dayKey());S.pubLog={};pDraw();GET('pubLog/'+k).then(v=>{if(pDay===k&&v!==null){S.pubLog=v||{};pDraw();}});}
+const nOf=a=>(S.pubLog[a.id]&&S.pubLog[a.id].n)||0;
 
 function pStats(){
-  const cats=cArr(),byId={};cats.forEach(c=>byId[c.id]=c);
   let accTot=0,accDone=0,artTot=0,artDone=0;
-  accList().forEach(a=>{const c=byId[a.cat];if(!c||!tgt(c))return;const g=tgt(c);accTot++;artTot+=g;const n=(S.pubLog[a.id]&&S.pubLog[a.id].n)||0;artDone+=Math.min(n,g);if(n>=g)accDone++;});
+  accList().forEach(a=>{const c=S.pubCats&&S.pubCats[a.cat];if(!c)return;const g=goalFor(a,c,pDay);if(!g)return;accTot++;artTot+=g;const n=nOf(a);artDone+=Math.min(n,g);if(n>=g)accDone++;});
   return{accTot,accDone,artTot,artDone};
 }
 function navBadges(){
@@ -744,7 +766,7 @@ function pDraw(){
   const cats=cArr(),accs=accList();
   if(!cats.length){
     main.append(mk('div',{class:'p-empty'},mk('b',{},'Aucune règle pour l\'instant'),
-      mk('span',{},'Crée tes catégories (ex : Nouveaux, Récents, Anciens), choisis combien d\'articles poster par jour, puis range tes comptes dedans.'),
+      mk('span',{},'Crée tes catégories (ex : Nouveaux, Récents, Anciens), choisis combien d\'articles poster par jour ou un programme par étapes, puis range tes comptes dedans.'),
       pSetOpen?null:mk('button',{class:'p-quick',type:'button',onclick:()=>{pSetOpen=true;pDraw();}},'⚙ Créer les catégories')));
     navBadges();return;
   }
@@ -757,14 +779,14 @@ function pDraw(){
   const byCat={};accs.forEach(a=>{const k=S.pubCats&&S.pubCats[a.cat]?a.cat:'_none';(byCat[k]=byCat[k]||[]).push(a);});
   cats.forEach(c=>{
     const list=byCat[c.id]||[];if(!list.length)return;
-    const g=tgt(c);
-    const nd=list.filter(a=>((S.pubLog[a.id]&&S.pubLog[a.id].n)||0)>=g&&g>0).length;
+    const goals={};list.forEach(a=>goals[a.id]=goalFor(a,c,pDay));
+    const active=list.filter(a=>goals[a.id]>0),nd=active.filter(a=>nOf(a)>=goals[a.id]).length;
     const sec=mk('section',{class:'p-cat'},
       mk('div',{class:'p-ch'},mk('span',{class:'p-cdot',style:'background:'+(c.color||'#999')}),mk('span',{class:'p-cn'},c.name),
-        mk('span',{class:'p-ct'},g?g+' articles / compte / jour':'Repos : rien à poster'),
-        g?mk('span',{class:'p-cp'},nd+'/'+list.length+' faits'):null));
+        mk('span',{class:'p-ct'},isProg(c)?'Programme : '+progLabel(c):(tgt(c)?tgt(c)+' articles / compte / jour':'Repos : rien à poster')),
+        active.length?mk('span',{class:'p-cp'},nd+'/'+active.length+' faits'):null));
     const ul=mk('ul',{class:'p-rows'});
-    list.sort((a,b)=>{const da=((S.pubLog[a.id]&&S.pubLog[a.id].n)||0)>=g?1:0,db=((S.pubLog[b.id]&&S.pubLog[b.id].n)||0)>=g?1:0;return g?da-db:0;}).forEach(a=>ul.append(pRow(a,g)));
+    list.sort((a,b)=>{const ga=goals[a.id],gb=goals[b.id];const ra=!ga?2:nOf(a)>=ga?1:0,rb=!gb?2:nOf(b)>=gb?1:0;return ra-rb;}).forEach(a=>ul.append(pRow(a,goals[a.id],c)));
     sec.append(ul);main.append(sec);
   });
   if(byCat._none&&byCat._none.length){
@@ -774,11 +796,12 @@ function pDraw(){
   }
   navBadges();
 }
-function pRow(a,g){
+function pRow(a,g,c){
   const e=S.pubLog[a.id];const n=e?(e.n||0):0;
   const st=!g?'rest':n>=g?'ok':n>0?'part':'todo';
-  const li=mk('li',{class:'p-row'+(st==='ok'?' ok':st==='part'?' part':'')},mk('span',{class:'p-an'},a.name));
-  if(st==='rest'){li.append(mk('span',{class:'p-rest'},'Repos'));return li;}
+  const jn=isProg(c)?dayNum(a.start||pDay,pDay):null;
+  const li=mk('li',{class:'p-row'+(st==='ok'?' ok':st==='part'?' part':'')},mk('span',{class:'p-an'},a.name,jn!=null?mk('span',{class:'p-jour'},jn<1?'pas commencé':'Jour '+jn):null));
+  if(st==='rest'){li.append(mk('span',{class:'p-rest'},'Repos aujourd\'hui'));return li;}
   li.append(mk('span',{class:'p-goal'},'Objectif : '+g));
   const act=mk('div',{class:'p-act'});
   if(pEdit===a.id){
@@ -816,50 +839,90 @@ function pSet(accId,n,ev,g){
 }
 
 // ---------- réglages publications
+function catPatch(c,ch,msg){Object.assign(S.pubCats[c.id],ch);W(()=>PATCH('pubCats/'+c.id,ch));if(msg)toast(msg);pDrawSet();pDraw();}
+function savePhases(c,ph){S.pubCats[c.id].phases=ph;W(()=>PUT('pubCats/'+c.id+'/phases',ph.length?ph:null));pDrawSet();pDraw();}
 function pDrawSet(){
   const box=$('#p-set');box.replaceChildren();
-  const cats=cArr(),accs=accList();
-  box.append(mk('h3',{},'1. Catégories et objectif par jour'),mk('div',{class:'help'},'Exemple : « Nouveaux » 5 / jour, « Récents » 15 / jour, « Anciens » 30 / jour. Mets 0 pour un compte au repos.'));
+  const cats=cArr(),accs=accList(),today=dayKey();
+  box.append(mk('h3',{},'1. Catégories et règles'),mk('div',{class:'help'},'« Fixe » : le même nombre chaque jour (0 = repos). « Programme » : des étapes, par exemple 1-2-3 répété pendant 10 jours, puis 5 par jour pendant 10 jours, puis 20 par jour. Chaque compte suit le programme à partir de son jour de départ.'));
   cats.forEach(c=>{
     const nm=mk('input',{class:'m-in',type:'text',value:c.name,maxlength:'40','aria-label':'Nom de la catégorie'});
-    nm.addEventListener('change',()=>{const v=nm.value.trim();if(!v)return;S.pubCats[c.id].name=v;W(()=>PATCH('pubCats/'+c.id,{name:v}));pDraw();});
-    const tg=mk('input',{class:'p-num',type:'number',min:'0',max:'999',value:String(tgt(c)),'aria-label':'Articles par jour pour '+c.name});
-    tg.addEventListener('change',()=>{const v=Math.max(0,parseInt(tg.value,10)||0);S.pubCats[c.id].target=v;W(()=>PATCH('pubCats/'+c.id,{target:v}));toast('Objectif « '+c.name+' » : '+v+' / jour');pDraw();});
-    const sw=mk('span',{class:'p-colors'});COLORS.forEach(col=>sw.append(mk('button',{class:'p-sw',type:'button',style:'background:'+col,'aria-label':'Couleur','aria-pressed':String(c.color===col),onclick:()=>{S.pubCats[c.id].color=col;W(()=>PATCH('pubCats/'+c.id,{color:col}));pDrawSet();pDraw();}})));
+    nm.addEventListener('change',()=>{const v=nm.value.trim();if(!v)return;catPatch(c,{name:v});});
+    const sw=mk('span',{class:'p-colors'});COLORS.forEach(col=>sw.append(mk('button',{class:'p-sw',type:'button',style:'background:'+col,'aria-label':'Couleur','aria-pressed':String(c.color===col),onclick:()=>catPatch(c,{color:col})})));
     const count=accs.filter(a=>a.cat===c.id).length;
     const del=pConfirmCat===c.id
       ?mk('button',{class:'m-mini danger',type:'button',onclick:()=>pDelCat(c)},'Confirmer ('+count+' compte'+(count>1?'s':'')+' sans catégorie)')
       :mk('button',{class:'m-mini',type:'button',onclick:()=>{pConfirmCat=c.id;pDrawSet();}},'Supprimer');
-    box.append(mk('div',{class:'p-crow'},mk('span',{class:'p-cdot',style:'background:'+(c.color||'#999')}),nm,tg,mk('span',{class:'p-ct'},'/ jour'),sw,del));
+    const prog=isProg(c);
+    const modes=mk('span',{class:'p-modes'},
+      mk('button',{class:'p-ctag',type:'button','aria-pressed':String(!prog),onclick:()=>{if(prog)catPatch(c,{mode:'fixe'});}},'Fixe'),
+      mk('button',{class:'p-ctag',type:'button','aria-pressed':String(prog),onclick:()=>{if(prog)return;const ch={mode:'prog'};if(!phasesOf(c).length){ch.phases=[{days:10,pattern:'1,2,3'},{days:10,pattern:'5'}];ch.target=tgt(c)||10;}catPatch(c,ch,'« '+c.name+' » est maintenant un programme : ajuste les étapes');}},'Programme'));
+    const card=mk('div',{class:'p-ccard'});
+    card.append(mk('div',{class:'p-crow',style:'background:none;padding:0'},mk('span',{class:'p-cdot',style:'background:'+(c.color||'#999')}),nm,modes,sw,del));
+    if(!prog){
+      const tg=mk('input',{class:'p-num',type:'number',min:'0',max:'999',value:String(tgt(c)),'aria-label':'Articles par jour pour '+c.name});
+      tg.addEventListener('change',()=>{const v=Math.max(0,parseInt(tg.value,10)||0);catPatch(c,{target:v},'Objectif « '+c.name+' » : '+v+' / jour');});
+      card.append(mk('div',{class:'p-ph'},mk('span',{class:'p-ct'},'Chaque jour :'),tg,mk('span',{class:'p-ct'},'articles par compte')));
+    }else{
+      const ph=phasesOf(c);
+      ph.forEach((p,i)=>{
+        const dI=mk('input',{class:'p-num',type:'number',min:'1',max:'365',value:String(p.days),'aria-label':'Nombre de jours de l\'étape '+(i+1)});
+        dI.addEventListener('change',()=>{const n=phasesOf(c);n[i].days=Math.max(1,parseInt(dI.value,10)||1);savePhases(c,n);});
+        const pI=mk('input',{class:'m-in p-pat',type:'text',value:p.pattern.replace(/,/g,', '),'aria-label':'Articles par jour de l\'étape '+(i+1),placeholder:'ex : 1, 2, 3'});
+        pI.addEventListener('change',()=>{const n=phasesOf(c);n[i].pattern=parsePat(pI.value).join(',');savePhases(c,n);});
+        card.append(mk('div',{class:'p-ph'},mk('span',{class:'p-step'},'Étape '+(i+1)),mk('span',{class:'p-ct'},'pendant'),dI,mk('span',{class:'p-ct'},'jours, poster'),pI,mk('span',{class:'p-ct'},parsePat(p.pattern).length>1?'(en boucle)':'par jour'),
+          mk('button',{class:'m-mini',type:'button','aria-label':'Supprimer l\'étape '+(i+1),onclick:()=>{const n=phasesOf(c);n.splice(i,1);savePhases(c,n);}},'✕')));
+      });
+      const fI=mk('input',{class:'p-num',type:'number',min:'0',max:'999',value:String(tgt(c)),'aria-label':'Articles par jour après le programme'});
+      fI.addEventListener('change',()=>catPatch(c,{target:Math.max(0,parseInt(fI.value,10)||0)}));
+      card.append(
+        mk('div',{class:'p-ph'},mk('button',{class:'m-mini',type:'button',onclick:()=>{const n=phasesOf(c);n.push({days:10,pattern:String((n.length&&parsePat(n[n.length-1].pattern).slice(-1)[0])||5)});savePhases(c,n);}},'+ Ajouter une étape')),
+        mk('div',{class:'p-ph'},mk('span',{class:'p-step'},'Ensuite'),mk('span',{class:'p-ct'},'tous les jours :'),fI,mk('span',{class:'p-ct'},'articles par compte')));
+      const prev=[];for(let d=1;d<=Math.min(60,phasesOf(c).reduce((s,p)=>s+p.days,0)+3);d++)prev.push(mk('span',{class:'p-pv',title:'Jour '+d},mk('small',{},'J'+d),String(progTarget(c,d))));
+      card.append(mk('div',{class:'p-prev'},prev));
+    }
+    box.append(card);
   });
   // ajout
   const nn=mk('input',{class:'m-in',type:'text',placeholder:'Nouvelle catégorie (ex : Nouveaux)',maxlength:'40',id:'p-newcat'});
   const nt=mk('input',{class:'p-num',type:'number',min:'0',max:'999',placeholder:'nb',id:'p-newtgt','aria-label':'Articles par jour'});
   const sw=mk('span',{class:'p-colors'});COLORS.forEach(col=>sw.append(mk('button',{class:'p-sw',type:'button',style:'background:'+col,'aria-label':'Couleur','aria-pressed':String(pNewColor===col),onclick:()=>{pNewColor=col;sw.querySelectorAll('.p-sw').forEach((b,i)=>b.setAttribute('aria-pressed',String(COLORS[i]===col)));}})));
-  const add=()=>{const name=nn.value.trim();if(!name){nn.focus();return;}const id=uid();const c={name,target:Math.max(0,parseInt(nt.value,10)||0),color:pNewColor,order:Date.now()};S.pubCats[id]=c;pNewColor=COLORS[(cArr().length)%COLORS.length];W(()=>PUT('pubCats/'+id,c));toast('Catégorie « '+name+' » créée');pDrawSet();pDraw();setTimeout(()=>{const x=document.getElementById('p-newcat');if(x)x.focus();});};
+  const add=()=>{const name=nn.value.trim();if(!name){nn.focus();return;}if(cArr().some(c=>c.name.trim().toLowerCase()===name.toLowerCase())){toast('⚠️ La catégorie « '+name+' » existe déjà');return;}const id=uid();const c={name,mode:'fixe',target:Math.max(0,parseInt(nt.value,10)||0),color:pNewColor,order:Date.now()};S.pubCats[id]=c;pNewColor=COLORS[(cArr().length)%COLORS.length];W(()=>PUT('pubCats/'+id,c));toast('Catégorie « '+name+' » créée');pDrawSet();pDraw();setTimeout(()=>{const x=document.getElementById('p-newcat');if(x)x.focus();});};
   nn.addEventListener('keydown',e=>{if(e.key==='Enter')add();});nt.addEventListener('keydown',e=>{if(e.key==='Enter')add();});
   box.append(mk('div',{class:'p-crow',style:'background:#eef5e6'},nn,nt,mk('span',{class:'p-ct'},'/ jour'),sw,mk('button',{class:'m-go',type:'button',style:'margin-left:0;padding:8px 14px;font-size:13px',onclick:add},'+ Créer')));
   // comptes
-  let tot=0;accs.forEach(a=>{const c=S.pubCats[a.cat];if(c)tot+=tgt(c);});
+  let tot=0,nAct=0;accs.forEach(a=>{const c=S.pubCats[a.cat];const g=goalFor(a,c,today);if(g){tot+=g;nAct++;}});
   box.append(mk('h3',{style:'margin-top:6px'},'2. Range chaque compte dans une catégorie'),
-    mk('div',{class:'help'},'Ce sont les mêmes comptes que dans le tracker SKU. Un clic suffit.'),
-    mk('div',{class:'p-total'},'Objectif total : '+tot+' articles par jour sur '+accs.filter(a=>S.pubCats[a.cat]&&tgt(S.pubCats[a.cat])).length+' comptes'));
+    mk('div',{class:'help'},'Ce sont les mêmes comptes que dans le tracker SKU. Un clic suffit. Quand tu mets un compte dans un programme, il commence au jour 1 aujourd\'hui (modifiable).'),
+    mk('div',{class:'p-total'},'Aujourd\'hui : '+tot+' articles à poster sur '+nAct+' comptes'));
   if(!accs.length)box.append(mk('div',{class:'help'},'Aucun compte. Ajoute-en un ci-dessous.'));
   accs.forEach(a=>{
     const tags=mk('span',{class:'p-ctags'});
     cats.forEach(c=>tags.append(mk('button',{class:'p-ctag',type:'button','aria-pressed':String(a.cat===c.id),onclick:()=>pSetCat(a.id,c.id)},mk('i',{style:'background:'+(c.color||'#999')}),c.name)));
     tags.append(mk('button',{class:'p-ctag',type:'button','aria-pressed':String(!S.pubCats[a.cat]),onclick:()=>pSetCat(a.id,null)},'Aucune'));
-    box.append(mk('div',{class:'p-arow'},mk('span',{class:'p-an'},a.name),tags));
+    const row=mk('div',{class:'p-arow'},mk('span',{class:'p-an'},a.name),tags);
+    const c=S.pubCats[a.cat];
+    if(isProg(c)){
+      const st=a.start||today;const jn=dayNum(st,today);
+      const di=mk('input',{class:'p-date',type:'date',value:st,max:today,'aria-label':'Jour de départ du programme pour '+a.name});
+      di.addEventListener('change',()=>{if(!di.value)return;S.accs[a.id].catStart=di.value;W(()=>PUT('accs/'+a.id+'/catStart',di.value));pDrawSet();pDraw();});
+      row.append(mk('span',{class:'p-startbox'},mk('span',{class:'p-jour'},'Jour '+jn+' · '+goalFor(a,c,today)+' aujourd\'hui'),mk('span',{class:'p-ct'},'départ le'),di,
+        mk('button',{class:'m-mini',type:'button',onclick:()=>{S.accs[a.id].catStart=today;W(()=>PUT('accs/'+a.id+'/catStart',today));toast(a.name+' recommence au jour 1');pDrawSet();pDraw();}},'Recommencer')));
+    }
+    box.append(row);
   });
   const na=mk('input',{class:'m-in',type:'text',placeholder:'Ajouter un compte Vinted (ex : vintage_rose)',maxlength:'60',id:'p-newacc'});
-  const addA=()=>{const name=na.value.trim();if(!name){na.focus();return;}const id=uid();const empIds={};Object.keys(S.emps||{}).forEach(k=>empIds[k]=true);const v={name,empIds};S.accs[id]=v;W(()=>PUT('accs/'+id,v));toast('Compte « '+name+' » ajouté');pDrawSet();pDraw();setTimeout(()=>{const x=document.getElementById('p-newacc');if(x)x.focus();});};
+  const addA=()=>{const name=na.value.trim();if(!name){na.focus();return;}if(accExists(name)){toast('⚠️ Le compte « '+name+' » existe déjà');na.select();return;}const id=uid();const empIds={};Object.keys(S.emps||{}).forEach(k=>empIds[k]=true);const v={name,empIds};S.accs[id]=v;W(()=>PUT('accs/'+id,v));toast('Compte « '+name+' » ajouté');pDrawSet();pDraw();setTimeout(()=>{const x=document.getElementById('p-newacc');if(x)x.focus();});};
   na.addEventListener('keydown',e=>{if(e.key==='Enter')addA();});
   box.append(mk('div',{class:'p-crow'},na,mk('button',{class:'m-mini',type:'button',onclick:addA},'+ Ajouter le compte')));
 }
 function pSetCat(accId,catId){
   if(!S.accs[accId])return;
-  if(catId)S.accs[accId].cat=catId;else delete S.accs[accId].cat;
-  W(()=>PUT('accs/'+accId+'/cat',catId||null));pDrawSet();pDraw();
+  if((S.accs[accId].cat||null)===(catId||null))return;
+  const today=dayKey();
+  if(catId){S.accs[accId].cat=catId;S.accs[accId].catStart=today;W(()=>PATCH('accs/'+accId,{cat:catId,catStart:today}));}
+  else{delete S.accs[accId].cat;W(()=>PATCH('accs/'+accId,{cat:null,catStart:null}));}
+  pDrawSet();pDraw();
 }
 function pDelCat(c){
   delete S.pubCats[c.id];pConfirmCat=null;
@@ -873,7 +936,7 @@ $('#p-next').addEventListener('click',()=>shiftDay(1));
 $('#p-label').addEventListener('click',()=>{if(pDay!==dayKey()){pDay=dayKey();pFollow=true;S.pubLog={};pDraw();GET('pubLog/'+pDay).then(v=>{if(v!==null){S.pubLog=v||{};pDraw();}});}});
 $('#p-setbtn').addEventListener('click',()=>{pSetOpen=!pSetOpen;pConfirmCat=null;pDraw();});
 
-window.mDraw=mDraw;window.pDraw=pDraw;window.navBadges=navBadges;
+window.mDraw=mDraw;window.pDraw=pDraw;window.navBadges=navBadges;window.accExists=accExists;
 })();
 
 
