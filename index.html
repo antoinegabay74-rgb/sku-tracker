@@ -799,9 +799,9 @@ const parsePat=s=>{const a=String(s==null?'':s).split(/[^0-9]+/).filter(Boolean)
 const phasesOf=c=>(Array.isArray(c.phases)?c.phases:Object.values(c.phases||{})).filter(Boolean).map(p=>({days:Math.max(1,parseInt(p.days,10)||1),pattern:parsePat(p.pattern).join(','),inf:!!p.inf}));
 const dateOf=k=>{const[a,m,d]=String(k).split('-').map(Number);return new Date(a,(m||1)-1,d||1);};
 const dayNum=(start,day)=>Math.round((dateOf(day)-dateOf(start))/86400000)+1; // jour 1 = jour de départ
-function progTarget(c,n){if(n<1)return 0;let d=n-1;for(const p of phasesOf(c)){if(p.inf||d<p.days){const pat=parsePat(p.pattern);return pat[d%pat.length];}d-=p.days;}return tgt(c);}
+function progTarget(c,n){if(n<1)return 0;let d=n-1;const ph=phasesOf(c);if(!ph.length)return tgt(c);for(let i=0;i<ph.length;i++){const p=ph[i];if(i===ph.length-1||d<p.days){const pat=parsePat(p.pattern);return pat[d%pat.length];}d-=p.days;}return 0;} // la dernière étape continue jusqu'au passage
 function goalFor(a,c,day){if(!c)return 0;if(!isProg(c))return tgt(c);return progTarget(c,dayNum(a.start||day,day));}
-function progLabel(c){const ph=phasesOf(c);const end=ph.length&&ph[ph.length-1].inf;return ph.map(p=>p.pattern.replace(/,/g,'-')+(p.inf?' sans fin':' pendant '+p.days+' j')).join(' → ')+(end?'':(ph.length?' → ':'')+'puis '+tgt(c)+' / jour');}
+function progLabel(c){const ph=phasesOf(c);return ph.map((p,i)=>p.pattern.replace(/,/g,'-')+(i===ph.length-1?(ph.length>1?' ensuite':' chaque jour'):' pendant '+p.days+' j')).join(' → ');}
 const addDays=(k,n)=>{const d=dateOf(k);d.setDate(d.getDate()+n);return dayKey(d);};
 const hasNext=c=>c&&c.next&&S.pubCats&&S.pubCats[c.next]&&c.next!==undefined&&(parseInt(c.after,10)||0)>0;
 // Passage automatique : après X jours dans une catégorie, le compte passe dans la suivante (jour 1 = le lendemain du dernier jour)
@@ -942,7 +942,7 @@ function pDrawSet0(){
     const prog=isProg(c);
     const modes=mk('span',{class:'p-modes'},
       mk('button',{class:'p-ctag',type:'button','aria-pressed':String(!prog),onclick:()=>{if(prog)catPatch(c,{mode:'fixe'});}},'Fixe'),
-      mk('button',{class:'p-ctag',type:'button','aria-pressed':String(prog),onclick:()=>{if(prog)return;const ch={mode:'prog'};if(!phasesOf(c).length){ch.phases=[{days:10,pattern:'1,2,3'},{days:10,pattern:'5'}];ch.target=tgt(c)||10;}catPatch(c,ch,'« '+c.name+' » est maintenant un programme : ajuste les étapes');}},'Programme'));
+      mk('button',{class:'p-ctag',type:'button','aria-pressed':String(prog),onclick:()=>{if(prog)return;const ch={mode:'prog'};if(!phasesOf(c).length){ch.phases=[{days:10,pattern:'1,2,3'},{days:10,pattern:'5'}];}catPatch(c,ch,'« '+c.name+' » est maintenant un programme : ajuste les étapes');}},'Programme'));
     const card=mk('div',{class:'p-ccard'});
     card.append(mk('div',{class:'p-crow',style:'background:none;padding:0'},mk('span',{class:'p-cdot',style:'background:'+(c.color||'#999')}),nm,modes,sw,del));
     if(!prog){
@@ -956,18 +956,16 @@ function pDrawSet0(){
         dI.addEventListener('change',()=>{const n=phasesOf(c);n[i].days=Math.max(1,parseInt(dI.value,10)||1);savePhases(c,n);});
         const pI=mk('input',{class:'m-in p-pat',type:'text',value:p.pattern.replace(/,/g,', '),'aria-label':'Articles par jour de l\'étape '+(i+1),placeholder:'ex : 1, 2, 3'});
         pI.addEventListener('change',()=>{const n=phasesOf(c);n[i].pattern=parsePat(pI.value).join(',');savePhases(c,n);});
-        const last=i===ph.length-1;
-        const infB=last?mk('button',{class:'p-ctag',type:'button','aria-pressed':String(!!p.inf),title:'Répéter cette étape pour toujours',onclick:()=>{const n=phasesOf(c);n[i].inf=!n[i].inf;savePhases(c,n);toast(n[i].inf?'Étape '+(i+1)+' : sans fin':'Étape '+(i+1)+' : '+n[i].days+' jours');}},'∞ Sans fin'):null;
-        card.append(mk('div',{class:'p-ph'},mk('span',{class:'p-step'},'Étape '+(i+1)),p.inf?mk('span',{class:'p-ct',style:'font-weight:800;color:#1b1f17'},'pour toujours, poster'):[mk('span',{class:'p-ct'},'pendant'),dI,mk('span',{class:'p-ct'},'jours, poster')],pI,mk('span',{class:'p-ct'},parsePat(p.pattern).length>1?'(en boucle)':'par jour'),infB,
-          mk('button',{class:'m-mini',type:'button','aria-label':'Supprimer l\'étape '+(i+1),onclick:()=>{const n=phasesOf(c);n.splice(i,1);savePhases(c,n);}},'✕')));
+        const last=i===ph.length-1;const nx=hasNext(c)?S.pubCats[c.next].name:null;
+        card.append(mk('div',{class:'p-ph'},mk('span',{class:'p-step'},'Étape '+(i+1)),last?mk('span',{class:'p-ct'},i?'ensuite, poster':'poster'):[mk('span',{class:'p-ct'},'pendant'),dI,mk('span',{class:'p-ct'},'jours, poster')],pI,mk('span',{class:'p-ct'},(parsePat(p.pattern).length>1?'(en boucle)':'par jour')+(last?(nx?' jusqu\'au passage en « '+nx+' »':' pour toujours'):'')),
+          ph.length>1?mk('button',{class:'m-mini',type:'button','aria-label':'Supprimer l\'étape '+(i+1),onclick:()=>{const n=phasesOf(c);n.splice(i,1);savePhases(c,n);}},'✕'):null));
       });
-      const fI=mk('input',{class:'p-num',type:'number',min:'0',max:'999',value:String(tgt(c)),'aria-label':'Articles par jour après le programme'});
-      fI.addEventListener('change',()=>catPatch(c,{target:Math.max(0,parseInt(fI.value,10)||0)}));
       card.append(
         mk('div',{class:'p-ph'},mk('button',{class:'m-mini',type:'button',onclick:()=>{const n=phasesOf(c);if(n.length)n[n.length-1].inf=false;n.push({days:10,pattern:String((n.length&&parsePat(n[n.length-1].pattern).slice(-1)[0])||5)});savePhases(c,n);}},'+ Ajouter une étape')),
-        (ph.length&&ph[ph.length-1].inf)?'':mk('div',{class:'p-ph'},mk('span',{class:'p-step'},'Ensuite'),mk('span',{class:'p-ct'},'tous les jours :'),fI,mk('span',{class:'p-ct'},'articles par compte')));
-      const prev=[];const php=phasesOf(c),infEnd=php.length&&php[php.length-1].inf;for(let d=1;d<=Math.min(60,php.reduce((s,p,j)=>s+(p.inf?0:p.days),0)+(infEnd?Math.max(6,parsePat(php[php.length-1].pattern).length*3):3));d++)prev.push(mk('span',{class:'p-pv',title:'Jour '+d},mk('small',{},'J'+d),String(progTarget(c,d))));
-      if(infEnd)prev.push(mk('span',{class:'p-pv',title:'Se répète pour toujours'},mk('small',{},'…'),'∞'));card.append(mk('div',{class:'p-prev'},prev));
+        '');
+      const prev=[];const php=phasesOf(c);const lastLen=php.length?parsePat(php[php.length-1].pattern).length:1;const span=php.slice(0,-1).reduce((t,p)=>t+p.days,0)+Math.max(6,lastLen*3);
+      for(let d=1;d<=Math.min(60,span);d++)prev.push(mk('span',{class:'p-pv',title:'Jour '+d},mk('small',{},'J'+d),String(progTarget(c,d))));
+      prev.push(mk('span',{class:'p-pv',title:'Continue jusqu\'au passage'},mk('small',{},'…'),'→'));card.append(mk('div',{class:'p-prev'},prev));
     }
     const others=cats.filter(o=>o.id!==c.id);
     const sel=mk('select',{class:'p-sel','aria-label':'Catégorie suivante pour '+c.name},mk('option',{value:''},'— ne change pas —'),others.map(o=>mk('option',{value:o.id,selected:c.next===o.id?'selected':null},o.name)));
