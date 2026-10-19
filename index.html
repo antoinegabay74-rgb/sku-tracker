@@ -297,6 +297,7 @@ textarea.inp{resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;f
       <div class="sbh">Équipe</div>
       <button class="nb" id="n-m" onclick="go('m')">🎯 Missions<span class="bd" id="bd-m" hidden></span></button>
       <button class="nb" id="n-p" onclick="go('p')">📅 Publications<span class="bd" id="bd-p" hidden></span></button>
+      <button class="nb" id="n-r" onclick="go('r')">⏰ Rappels<span class="bd" id="bd-r" hidden></span></button>
     </nav>
     <div class="sbf">Connectée en tant que<b id="who">Inah</b></div>
   </aside>
@@ -320,19 +321,6 @@ textarea.inp{resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;f
           <button type="button" class="m-link" id="m-redit">Modifier la liste</button>
         </section>
 
-        <section class="m-box" aria-labelledby="rm-h">
-          <div class="m-sec" id="rm-h">⏰ Rappels réguliers</div>
-          <div class="m-lbl" style="text-transform:none;letter-spacing:0;font-size:12px;font-weight:600">Une fenêtre apparaît à l'écran le jour venu, jusqu'à ce qu'on clique « C'est fait ».</div>
-          <ul class="m-recur" id="rm-list"></ul>
-          <form class="m-row" id="rm-form" autocomplete="off">
-            <input class="m-in" type="text" id="rm-title" placeholder="Nouveau rappel… ex : Vérifier les proxies" maxlength="120">
-            <span class="m-lbl" style="text-transform:none;letter-spacing:0">tous les</span>
-            <input class="p-num" type="number" id="rm-every" min="1" max="365" value="4" aria-label="Tous les combien de jours">
-            <span class="m-lbl" style="text-transform:none;letter-spacing:0">jours, à partir du</span>
-            <input class="p-date" type="date" id="rm-start" aria-label="Premier rappel le">
-            <button class="m-mini" type="submit">+ Ajouter</button>
-          </form>
-        </section>
 
         <div class="m-sec">🎯 Missions ponctuelles</div>
         <form class="m-box" id="m-form" autocomplete="off">
@@ -368,6 +356,23 @@ textarea.inp{resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;f
       <div class="ct"><div class="p-wrap">
         <div class="p-set" id="p-set" hidden></div>
         <div id="p-main"></div>
+      </div></div>
+    </div>
+    <div id="v-r" hidden>
+      <div class="hdr"><h1 id="rm-h">⏰ Rappels</h1><p>Des tâches à refaire tous les X jours. Une fenêtre apparaît à l'écran le jour venu.</p></div>
+      <div class="ct"><div class="m-wrap">
+        <section class="m-box" aria-label="Rappels">
+                    <div class="m-lbl" style="text-transform:none;letter-spacing:0;font-size:12px;font-weight:600">Une fenêtre apparaît à l'écran le jour venu, jusqu'à ce qu'on clique « C'est fait ».</div>
+          <ul class="m-recur" id="rm-list"></ul>
+          <form class="m-row" id="rm-form" autocomplete="off">
+            <input class="m-in" type="text" id="rm-title" placeholder="Nouveau rappel… ex : Vérifier les proxies" maxlength="120">
+            <span class="m-lbl" style="text-transform:none;letter-spacing:0">tous les</span>
+            <input class="p-num" type="number" id="rm-every" min="1" max="365" value="4" aria-label="Tous les combien de jours">
+            <span class="m-lbl" style="text-transform:none;letter-spacing:0">jours, à partir du</span>
+            <input class="p-date" type="date" id="rm-start" aria-label="Premier rappel le">
+            <button class="m-mini" type="submit">+ Ajouter</button>
+          </form>
+        </section>
       </div></div>
     </div>
   </main>
@@ -705,7 +710,6 @@ function mDraw(){
         :mk('button',{class:'m-mini',type:'button',onclick:()=>{mConfirmDel=t.id;mDraw();}},'Supprimer')));
   });
   const week=Date.now()-7*86400000;
-  rmDraw();
   $('#m-score').textContent=done.filter(t=>(t.doneAt||0)>week).length;
   navBadges();
 }
@@ -769,6 +773,7 @@ function rmDraw(){
 }
 function rmDone(r,ev){const t=dayKey();const ch={lastDone:t,by:who()||null};Object.assign(S.reminders[r.id],ch);if(!ch.by)delete S.reminders[r.id].by;W(()=>PATCH('reminders/'+r.id,ch));burst(...ptOf(ev),30);toast('Rappel fait ✔ · prochain dans '+r.every+' jours');rmDraw();rmPopup();}
 function rmPopup(){
+  const bd=document.getElementById('bd-r');if(bd){const n=rmArr().filter(rmDue).length;bd.textContent=n;bd.hidden=!n;}
   let box=document.getElementById('rm-pop');
   const due=rmArr().filter(r=>rmDue(r)&&rmLater[r.id]!==dayKey());
   if(!due.length){if(box)box.remove();return;}
@@ -780,7 +785,7 @@ function rmPopup(){
 $('#rm-form').addEventListener('submit',e=>{e.preventDefault();const title=$('#rm-title').value.trim();if(!title){$('#rm-title').focus();return;}
   const every=Math.max(1,parseInt($('#rm-every').value,10)||4);const start=$('#rm-start').value||dayKey();const id=uid();const r={title,every,start,created:Date.now()};
   S.reminders[id]=r;$('#rm-title').value='';W(()=>PUT('reminders/'+id,r));toast('Rappel ajouté : tous les '+every+' jours');rmDraw();rmPopup();});
-window.rmPopup=rmPopup;
+window.rmPopup=rmPopup;window.rmDraw=rmDraw;
 
 // ================= PUBLICATIONS =================
 const COLORS=['#e53935','#fb8c00','#fdd835','#43a047','#1e88e5','#8e24aa','#00897b','#6d4c41'];
@@ -1030,7 +1035,7 @@ window.mDraw=mDraw;window.pDraw=pDraw;window.navBadges=navBadges;window.accExist
 
 
 // ================= Navigation + synchro =================
-const TABS=['a','d','s','m','p'];
+const TABS=['a','d','s','m','p','r'];
 function go(t){
   if(!TABS.includes(t))t='a';curTab=t;
   try{localStorage.setItem('tab',t);}catch(e){}
@@ -1038,7 +1043,7 @@ function go(t){
   draw();
 }
 function draw(){
-  if(curTab==='a')drawA();else if(curTab==='d')drawD();else if(curTab==='s')drawS();else if(curTab==='m')mDraw();else if(curTab==='p')pDraw();
+  if(curTab==='a')drawA();else if(curTab==='d')drawD();else if(curTab==='s')drawS();else if(curTab==='m')mDraw();else if(curTab==='p')pDraw();else if(curTab==='r'&&window.rmDraw)rmDraw();
   if(window.navBadges)navBadges();
 }
 async function sync(){
