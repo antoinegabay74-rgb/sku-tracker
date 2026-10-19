@@ -400,7 +400,7 @@ function drawA(){
   let shown=st.filter(x=>!q||x.a.name.toLowerCase().includes(q));
   if(aFilter==='todo')shown=shown.filter(x=>x.done<x.tot);
   if(aFilter==='full')shown=shown.filter(x=>x.tot&&x.done>=x.tot);
-  const todoAccs=st.filter(x=>x.done<x.tot).length;
+  const todoAccs=st.filter(x=>x.done<x.tot).length,fullAccs=st.filter(x=>x.tot&&x.done>=x.tot).length;
   v.replaceChildren(
     mk('div',{class:'hdr'},mk('h1',{},'🏪 Comptes & SKU'),mk('p',{},accs.length+' comptes Vinted · '+skus.length+' SKU · clique sur un compte pour voir ses SKU')),
     mk('div',{class:'ct'},
@@ -409,11 +409,26 @@ function drawA(){
         mk('div',{class:'chips'},
           chip('Tous · '+accs.length,aFilter==='all',()=>{aFilter='all';drawA();}),
           chip('À finir · '+todoAccs,aFilter==='todo',()=>{aFilter='todo';drawA();}),
-          chip('Terminés · '+(accs.length-todoAccs),aFilter==='full',()=>{aFilter='full';drawA();}))),
+          chip('Terminés · '+fullAccs,aFilter==='full',()=>{aFilter='full';drawA();}))),
+      addAccBar(),
       !accs.length?mk('div',{class:'s-empty'},mk('b',{},'Aucun compte'),'Ajoute tes comptes dans « Réglages SKU ».')
       :!shown.length?mk('div',{class:'s-empty'},'Aucun compte ne correspond.')
       :mk('div',{class:'s-grid'},shown.map(x=>accCard(x)))));
-  refocus('a-search');
+  refocus('a-search');refocus('a-new');
+}
+function addAccBar(){
+  const i=mk('input',{class:'inp',id:'a-new',placeholder:'Nom du nouveau compte Vinted (plusieurs : sépare par des virgules)',maxlength:'400','aria-label':'Nouveau compte'});
+  const go2=()=>{
+    const names=i.value.split(/[,\n;]+/).map(x=>x.trim()).filter(Boolean);if(!names.length){i.focus();return;}
+    const exist=new Set(accArr().map(a=>a.name.toLowerCase()));const empIds={};Object.keys(S.emps||{}).forEach(k=>empIds[k]=true);
+    const add={};let dup=0;names.forEach(n=>{if(exist.has(n.toLowerCase())){dup++;return;}exist.add(n.toLowerCase());const id=uid();add[id]={name:n,empIds};S.accs[id]=add[id];});
+    const k=Object.keys(add).length;
+    if(k)W(()=>PATCH('accs',add));
+    toast(k?(k>1?k+' comptes ajoutés':'Compte « '+Object.values(add)[0].name+' » ajouté')+(dup?' · '+dup+' déjà existant(s)':''):'Ce compte existe déjà');
+    i.value='';_focusId='a-new';_focusPos=0;drawA();
+  };
+  i.addEventListener('keydown',e=>{if(e.key==='Enter')go2();});
+  return mk('div',{class:'row',style:'margin-bottom:16px;background:var(--surface);border:1px dashed #cfd6c4;border-radius:12px;padding:10px'},i,mk('button',{class:'btn g',type:'button',onclick:go2},'+ Ajouter le compte'));
 }
 function catOf(a){const c=a.cat&&S.pubCats&&S.pubCats[a.cat];return c||null;}
 function accCard({a,tot,done}){
