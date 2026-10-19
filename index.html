@@ -760,13 +760,13 @@ let rmConfirm=null;const rmLater={};
 const rmArr=()=>Object.entries(S.reminders||{}).filter(([,v])=>v&&typeof v==='object').map(([id,v])=>({id,...v})).sort((a,b)=>(a.created||0)-(b.created||0));
 function rmNext(r){const ev=Math.max(1,parseInt(r.every,10)||1);if(!r.lastDone)return r.start||dayKey();const d=dateOf(r.lastDone);d.setDate(d.getDate()+ev);return dayKey(d);}
 const rmDue=r=>rmNext(r)<=dayKey();
-function rmLabel(k){const t=dayKey();if(k<=t)return'aujourd\'hui';const n=Math.round((dateOf(k)-dateOf(t))/86400000);return n===1?'demain':'dans '+n+' jours';}
+function rmLabel(k){const t=dayKey();if(k<=t)return'aujourd\'hui';const n=Math.round((dateOf(k)-dateOf(t))/86400000);const d=dateOf(k).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});return (n===1?'demain':'dans '+n+' jours')+' ('+d+')';}
 function rmDraw(){
   const ul=$('#rm-list');if(!ul)return;ul.replaceChildren();const list=rmArr();
   if(!list.length)ul.append(mk('li',{class:'m-rt',style:'color:#999;font-weight:600'},'Aucun rappel pour l\'instant.'));
   list.forEach(r=>{const nx=rmNext(r),due=nx<=dayKey();
     ul.append(mk('li',{class:'m-ritem',style:due?'background:#fff3dc':''},mk('span',{class:'m-dot',style:'background:'+(due?'#f0a020':'#4a7c14')}),
-      mk('span',{class:'m-rt'},r.title,mk('span',{style:'display:block;font-size:11.5px;color:#777;font-weight:600'},'Tous les '+r.every+' jours · prochain : '+rmLabel(nx)+(r.lastDone?' · dernier fait le '+dateOf(r.lastDone).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+(r.by?' par '+r.by:''):''))),
+      mk('span',{class:'m-rt'},r.title,mk('span',{style:'display:block;font-size:11.5px;color:#777;font-weight:600'},'Tous les '+r.every+' jours · la fenêtre apparaîtra '+rmLabel(nx)+(r.lastDone?' · dernier fait le '+dateOf(r.lastDone).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+(r.by?' par '+r.by:''):''))),
       due?mk('button',{class:'m-mini on',type:'button',onclick:()=>rmDone(r)},'✓ Fait'):null,
       rmConfirm===r.id?mk('button',{class:'m-mini danger',type:'button',onclick:()=>{delete S.reminders[r.id];rmConfirm=null;W(()=>PUT('reminders/'+r.id,null));toast('Rappel supprimé');rmDraw();rmPopup();}},'Confirmer'):mk('button',{class:'m-mini',type:'button',onclick:()=>{rmConfirm=r.id;rmDraw();}},'Supprimer')));});
   const st=$('#rm-start');if(st&&!st.value)st.value=dayKey();
