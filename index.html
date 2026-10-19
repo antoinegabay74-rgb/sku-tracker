@@ -270,6 +270,19 @@ textarea.inp{resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;f
 .p-pv small{font-size:9px;color:#999;font-weight:700}
 .p-startbox{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto}
 .p-date{border:1px solid #ddd;border-radius:8px;padding:5px 7px;font:inherit;font-size:12px}
+.p-sel{border:1px solid #ddd;border-radius:8px;padding:7px 9px;font:inherit;font-size:13px;font-weight:700;background:#fff}
+.p-promo{border-top:1px dashed #e2e5dc;padding-top:9px}
+.rm-pop{position:fixed;right:20px;bottom:20px;width:340px;max-width:calc(100% - 32px);background:#1b1f17;color:#fff;border-radius:16px;padding:16px;z-index:1800;box-shadow:0 18px 50px rgba(0,0,0,.35);display:flex;flex-direction:column;gap:10px;animation:rmIn .35s ease-out}
+@keyframes rmIn{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.rm-pop{animation:none}}
+.rm-h{font-weight:800;font-size:15px}
+.rm-item{background:rgba(255,255,255,.07);border-radius:11px;padding:11px 12px;display:flex;flex-direction:column;gap:4px}
+.rm-t{font-weight:800;font-size:14.5px;overflow-wrap:anywhere}
+.rm-s{font-size:12px;color:#b9c0b1}
+.rm-b{display:flex;gap:8px;margin-top:6px}
+.rm-ok{background:#7cc23a;color:#13230a;border:0;border-radius:9px;padding:8px 14px;font-weight:800}
+.rm-later{background:none;border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:9px;padding:8px 12px;font-weight:700}
+@media (max-width:760px){.rm-pop{left:16px;right:16px;bottom:16px;width:auto}}
 </style>
 </head>
 <body>
@@ -305,6 +318,20 @@ textarea.inp{resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;f
             <button class="m-mini" type="submit">Ajouter</button>
           </form>
           <button type="button" class="m-link" id="m-redit">Modifier la liste</button>
+        </section>
+
+        <section class="m-box" aria-labelledby="rm-h">
+          <div class="m-sec" id="rm-h">⏰ Rappels réguliers</div>
+          <div class="m-lbl" style="text-transform:none;letter-spacing:0;font-size:12px;font-weight:600">Une fenêtre apparaît à l'écran le jour venu, jusqu'à ce qu'on clique « C'est fait ».</div>
+          <ul class="m-recur" id="rm-list"></ul>
+          <form class="m-row" id="rm-form" autocomplete="off">
+            <input class="m-in" type="text" id="rm-title" placeholder="Nouveau rappel… ex : Vérifier les proxies" maxlength="120">
+            <span class="m-lbl" style="text-transform:none;letter-spacing:0">tous les</span>
+            <input class="p-num" type="number" id="rm-every" min="1" max="365" value="4" aria-label="Tous les combien de jours">
+            <span class="m-lbl" style="text-transform:none;letter-spacing:0">jours, à partir du</span>
+            <input class="p-date" type="date" id="rm-start" aria-label="Premier rappel le">
+            <button class="m-mini" type="submit">+ Ajouter</button>
+          </form>
         </section>
 
         <div class="m-sec">🎯 Missions ponctuelles</div>
@@ -616,17 +643,18 @@ function copyModal(from){
 
 
 // ================= ESPACE ÉQUIPE : Missions + Publications =================
-S.tasks={};S.recur={};S.pubCats={};S.pubLog={};
+S.tasks={};S.recur={};S.pubCats={};S.pubLog={};S.reminders={};
 const dayKey=(d=new Date())=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 let pDay=dayKey(), pFollow=true;
 
 async function syncTeam(){
   const v0=WV;
   const day=pDay;
-  const[t,r,c,l]=await Promise.all([GET('tasks'),GET('recur'),GET('pubCats'),GET('pubLog/'+day)]);
+  const[t,r,c,l,rm]=await Promise.all([GET('tasks'),GET('recur'),GET('pubCats'),GET('pubLog/'+day),GET('reminders')]);
   if(WV!==v0||PEND>0||day!==pDay)return;
   if(t!==null)S.tasks=t||{};
   if(r!==null)S.recur=r||{};
+  if(rm!==null)S.reminders=rm||{};
   if(c!==null)S.pubCats=c||{};
   if(l!==null)S.pubLog=l||{};
 }
@@ -677,6 +705,7 @@ function mDraw(){
         :mk('button',{class:'m-mini',type:'button',onclick:()=>{mConfirmDel=t.id;mDraw();}},'Supprimer')));
   });
   const week=Date.now()-7*86400000;
+  rmDraw();
   $('#m-score').textContent=done.filter(t=>(t.doneAt||0)>week).length;
   navBadges();
 }
@@ -722,6 +751,37 @@ $('#m-rform').addEventListener('submit',e=>{
   mDraw();toast('Ajoutée aux missions récurrentes');W(()=>PUT('recur/'+id,r));
 });
 
+// ================= RAPPELS =================
+let rmConfirm=null;const rmLater={};
+const rmArr=()=>Object.entries(S.reminders||{}).filter(([,v])=>v&&typeof v==='object').map(([id,v])=>({id,...v})).sort((a,b)=>(a.created||0)-(b.created||0));
+function rmNext(r){const ev=Math.max(1,parseInt(r.every,10)||1);if(!r.lastDone)return r.start||dayKey();const d=dateOf(r.lastDone);d.setDate(d.getDate()+ev);return dayKey(d);}
+const rmDue=r=>rmNext(r)<=dayKey();
+function rmLabel(k){const t=dayKey();if(k<=t)return'aujourd\'hui';const n=Math.round((dateOf(k)-dateOf(t))/86400000);return n===1?'demain':'dans '+n+' jours';}
+function rmDraw(){
+  const ul=$('#rm-list');if(!ul)return;ul.replaceChildren();const list=rmArr();
+  if(!list.length)ul.append(mk('li',{class:'m-rt',style:'color:#999;font-weight:600'},'Aucun rappel pour l\'instant.'));
+  list.forEach(r=>{const nx=rmNext(r),due=nx<=dayKey();
+    ul.append(mk('li',{class:'m-ritem',style:due?'background:#fff3dc':''},mk('span',{class:'m-dot',style:'background:'+(due?'#f0a020':'#4a7c14')}),
+      mk('span',{class:'m-rt'},r.title,mk('span',{style:'display:block;font-size:11.5px;color:#777;font-weight:600'},'Tous les '+r.every+' jours · prochain : '+rmLabel(nx)+(r.lastDone?' · dernier fait le '+dateOf(r.lastDone).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+(r.by?' par '+r.by:''):''))),
+      due?mk('button',{class:'m-mini on',type:'button',onclick:()=>rmDone(r)},'✓ Fait'):null,
+      rmConfirm===r.id?mk('button',{class:'m-mini danger',type:'button',onclick:()=>{delete S.reminders[r.id];rmConfirm=null;W(()=>PUT('reminders/'+r.id,null));toast('Rappel supprimé');rmDraw();rmPopup();}},'Confirmer'):mk('button',{class:'m-mini',type:'button',onclick:()=>{rmConfirm=r.id;rmDraw();}},'Supprimer')));});
+  const st=$('#rm-start');if(st&&!st.value)st.value=dayKey();
+}
+function rmDone(r,ev){const t=dayKey();const ch={lastDone:t,by:who()||null};Object.assign(S.reminders[r.id],ch);if(!ch.by)delete S.reminders[r.id].by;W(()=>PATCH('reminders/'+r.id,ch));burst(...ptOf(ev),30);toast('Rappel fait ✔ · prochain dans '+r.every+' jours');rmDraw();rmPopup();}
+function rmPopup(){
+  let box=document.getElementById('rm-pop');
+  const due=rmArr().filter(r=>rmDue(r)&&rmLater[r.id]!==dayKey());
+  if(!due.length){if(box)box.remove();return;}
+  if(!box){box=mk('div',{id:'rm-pop',class:'rm-pop',role:'alertdialog','aria-label':'Rappels'});document.body.append(box);}
+  box.replaceChildren(mk('div',{class:'rm-h'},'⏰ Rappel'+(due.length>1?'s ('+due.length+')':'')),
+    ...due.slice(0,4).map(r=>mk('div',{class:'rm-item'},mk('div',{class:'rm-t'},r.title),mk('div',{class:'rm-s'},'À faire tous les '+r.every+' jours'),
+      mk('div',{class:'rm-b'},mk('button',{class:'rm-ok',type:'button',onclick:e=>rmDone(r,e)},'✓ C\'est fait'),mk('button',{class:'rm-later',type:'button',onclick:()=>{rmLater[r.id]=dayKey();rmPopup();}},'Plus tard')))));
+}
+$('#rm-form').addEventListener('submit',e=>{e.preventDefault();const title=$('#rm-title').value.trim();if(!title){$('#rm-title').focus();return;}
+  const every=Math.max(1,parseInt($('#rm-every').value,10)||4);const start=$('#rm-start').value||dayKey();const id=uid();const r={title,every,start,created:Date.now()};
+  S.reminders[id]=r;$('#rm-title').value='';W(()=>PUT('reminders/'+id,r));toast('Rappel ajouté : tous les '+every+' jours');rmDraw();rmPopup();});
+window.rmPopup=rmPopup;
+
 // ================= PUBLICATIONS =================
 const COLORS=['#e53935','#fb8c00','#fdd835','#43a047','#1e88e5','#8e24aa','#00897b','#6d4c41'];
 let pSetOpen=false,pEdit=null,pNewColor=COLORS[3],pConfirmCat=null;
@@ -737,6 +797,21 @@ const dayNum=(start,day)=>Math.round((dateOf(day)-dateOf(start))/86400000)+1; //
 function progTarget(c,n){if(n<1)return 0;let d=n-1;for(const p of phasesOf(c)){if(p.inf||d<p.days){const pat=parsePat(p.pattern);return pat[d%pat.length];}d-=p.days;}return tgt(c);}
 function goalFor(a,c,day){if(!c)return 0;if(!isProg(c))return tgt(c);return progTarget(c,dayNum(a.start||day,day));}
 function progLabel(c){const ph=phasesOf(c);const end=ph.length&&ph[ph.length-1].inf;return ph.map(p=>p.pattern.replace(/,/g,'-')+(p.inf?' sans fin':' pendant '+p.days+' j')).join(' → ')+(end?'':(ph.length?' → ':'')+'puis '+tgt(c)+' / jour');}
+const addDays=(k,n)=>{const d=dateOf(k);d.setDate(d.getDate()+n);return dayKey(d);};
+const hasNext=c=>c&&c.next&&S.pubCats&&S.pubCats[c.next]&&c.next!==undefined&&(parseInt(c.after,10)||0)>0;
+// Passage automatique : après X jours dans une catégorie, le compte passe dans la suivante (jour 1 = le lendemain du dernier jour)
+function autoPromote(){
+  if(!S.pubCats||!S.accs)return;const today=dayKey();const moves=[];
+  Object.entries(S.accs).forEach(([id,v])=>{
+    if(!v||!v.cat)return;if(!v.catStart){if(hasNext(S.pubCats[v.cat])){v.catStart=today;moves.push([id,null,v.cat,today]);}return;}let cat=v.cat,start=v.catStart,n=0;
+    while(n<20){const c=S.pubCats[cat];if(!hasNext(c))break;const after=parseInt(c.after,10);if(dayNum(start,today)<=after)break;start=addDays(start,after);cat=c.next;n++;}
+    if(cat!==v.cat){v.cat=cat;v.catStart=start;moves.push([id,v.name,cat,start]);}
+  });
+  if(!moves.length)return;
+  W(async()=>{for(const[id,,cat,start]of moves)await PATCH('accs/'+id,{cat,catStart:start});});
+  const real=moves.filter(m=>m[1]);if(real.length)toast(real.length===1?real[0][1]+' passe en « '+S.pubCats[real[0][2]].name+' »':real.length+' comptes changent de catégorie');
+}
+function promoInfo(a,c,day){if(!hasNext(c)||!a.start)return null;const left=parseInt(c.after,10)-dayNum(a.start,day)+1;return left>0?{left,to:S.pubCats[c.next].name}:null;}
 function accExists(name,exceptId){const n=String(name).trim().toLowerCase();return Object.entries(S.accs||{}).some(([id,v])=>id!==exceptId&&String((v&&v.name)||v).trim().toLowerCase()===n);}
 
 function dayLabel(k){
@@ -803,8 +878,8 @@ function pDraw(){
 function pRow(a,g,c){
   const e=S.pubLog[a.id];const n=e?(e.n||0):0;
   const st=!g?'rest':n>=g?'ok':n>0?'part':'todo';
-  const jn=isProg(c)?dayNum(a.start||pDay,pDay):null;
-  const li=mk('li',{class:'p-row'+(st==='ok'?' ok':st==='part'?' part':'')},mk('span',{class:'p-an'},a.name,jn!=null?mk('span',{class:'p-jour'},jn<1?'pas commencé':'Jour '+jn):null));
+  const jn=(isProg(c)||hasNext(c))&&a.start?dayNum(a.start,pDay):(isProg(c)?1:null);const pi=promoInfo(a,c,pDay);
+  const li=mk('li',{class:'p-row'+(st==='ok'?' ok':st==='part'?' part':'')},mk('span',{class:'p-an'},a.name,jn!=null?mk('span',{class:'p-jour'},jn<1?'pas commencé':'Jour '+jn):null,pi?mk('span',{class:'p-jour',style:'color:#7a4a00;background:#fff3dc'},'→ '+pi.to+(pi.left===1?' demain':' dans '+pi.left+' j')):null));
   if(st==='rest'){li.append(mk('span',{class:'p-rest'},'Repos aujourd\'hui'));return li;}
   li.append(mk('span',{class:'p-goal'},'Objectif : '+g));
   const act=mk('div',{class:'p-act'});
@@ -845,10 +920,12 @@ function pSet(accId,n,ev,g){
 // ---------- réglages publications
 function catPatch(c,ch,msg){Object.assign(S.pubCats[c.id],ch);W(()=>PATCH('pubCats/'+c.id,ch));if(msg)toast(msg);pDrawSet();pDraw();}
 function savePhases(c,ph){S.pubCats[c.id].phases=ph;W(()=>PUT('pubCats/'+c.id+'/phases',ph.length?ph:null));pDrawSet();pDraw();}
-function pDrawSet(){
-  const box=$('#p-set');box.replaceChildren();
+let _pds=false;
+function pDrawSet(){if(_pds)return;_pds=true;try{pDrawSet0();}finally{_pds=false;}}
+function pDrawSet0(){
+  const box=$('#p-set');const ae=document.activeElement;if(ae&&box.contains(ae))ae.blur();box.replaceChildren();
   const cats=cArr(),accs=accList(),today=dayKey();
-  box.append(mk('h3',{},'1. Catégories et règles'),mk('div',{class:'help'},'« Fixe » : le même nombre chaque jour (0 = repos). « Programme » : des étapes, par exemple 1-2-3 répété pendant 10 jours, puis 5 par jour pendant 10 jours, puis 20 par jour. Chaque compte suit le programme à partir de son jour de départ.'));
+  box.append(mk('h3',{},'1. Catégories et règles'),mk('div',{class:'help'},'« Fixe » : le même nombre chaque jour (0 = repos). « Programme » : des étapes, par exemple 1-2-3 répété pendant 10 jours, puis 5 par jour pendant 10 jours, puis 20 par jour. Chaque compte suit le programme à partir de son jour de départ. « Passage » : après X jours, le compte passe tout seul dans la catégorie choisie et prend ses règles (jour 1).'));
   cats.forEach(c=>{
     const nm=mk('input',{class:'m-in',type:'text',value:c.name,maxlength:'40','aria-label':'Nom de la catégorie'});
     nm.addEventListener('change',()=>{const v=nm.value.trim();if(!v)return;catPatch(c,{name:v});});
@@ -887,6 +964,12 @@ function pDrawSet(){
       const prev=[];const php=phasesOf(c),infEnd=php.length&&php[php.length-1].inf;for(let d=1;d<=Math.min(60,php.reduce((s,p,j)=>s+(p.inf?0:p.days),0)+(infEnd?Math.max(6,parsePat(php[php.length-1].pattern).length*3):3));d++)prev.push(mk('span',{class:'p-pv',title:'Jour '+d},mk('small',{},'J'+d),String(progTarget(c,d))));
       if(infEnd)prev.push(mk('span',{class:'p-pv',title:'Se répète pour toujours'},mk('small',{},'…'),'∞'));card.append(mk('div',{class:'p-prev'},prev));
     }
+    const others=cats.filter(o=>o.id!==c.id);
+    const sel=mk('select',{class:'p-sel','aria-label':'Catégorie suivante pour '+c.name},mk('option',{value:''},'— ne change pas —'),others.map(o=>mk('option',{value:o.id,selected:c.next===o.id?'selected':null},o.name)));
+    sel.addEventListener('change',()=>{const v=sel.value||null;const ch={next:v};if(v&&!(parseInt(c.after,10)>0))ch.after=14;catPatch(c,ch,v?'Les comptes « '+c.name+' » passeront en « '+S.pubCats[v].name+' »':'Plus de passage automatique pour « '+c.name+' »');autoPromote();});
+    const aI=mk('input',{class:'p-num',type:'number',min:'1',max:'999',value:String(parseInt(c.after,10)||14),'aria-label':'Nombre de jours avant le passage','disabled':c.next?null:'disabled'});
+    aI.addEventListener('change',()=>{catPatch(c,{after:Math.max(1,parseInt(aI.value,10)||1)});autoPromote();});
+    card.append(mk('div',{class:'p-ph p-promo'},mk('span',{class:'p-step',style:'color:#7a4a00'},'Passage'),mk('span',{class:'p-ct'},'après'),aI,mk('span',{class:'p-ct'},'jours, passer en'),sel));
     box.append(card);
   });
   // ajout
@@ -908,11 +991,11 @@ function pDrawSet(){
     tags.append(mk('button',{class:'p-ctag',type:'button','aria-pressed':String(!S.pubCats[a.cat]),onclick:()=>pSetCat(a.id,null)},'Aucune'));
     const row=mk('div',{class:'p-arow'},mk('span',{class:'p-an'},a.name),tags);
     const c=S.pubCats[a.cat];
-    if(isProg(c)){
-      const st=a.start||today;const jn=dayNum(st,today);
+    if(isProg(c)||hasNext(c)){
+      const st=a.start||today;const jn=dayNum(st,today);const pi=promoInfo(Object.assign({},a,{start:st}),c,today);
       const di=mk('input',{class:'p-date',type:'date',value:st,max:today,'aria-label':'Jour de départ du programme pour '+a.name});
-      di.addEventListener('change',()=>{if(!di.value)return;S.accs[a.id].catStart=di.value;W(()=>PUT('accs/'+a.id+'/catStart',di.value));pDrawSet();pDraw();});
-      row.append(mk('span',{class:'p-startbox'},mk('span',{class:'p-jour'},'Jour '+jn+' · '+goalFor(a,c,today)+' aujourd\'hui'),mk('span',{class:'p-ct'},'départ le'),di,
+      di.addEventListener('change',()=>{if(!di.value)return;S.accs[a.id].catStart=di.value;W(()=>PUT('accs/'+a.id+'/catStart',di.value));autoPromote();pDrawSet();pDraw();});
+      row.append(mk('span',{class:'p-startbox'},mk('span',{class:'p-jour'},'Jour '+jn+' · '+goalFor(a,c,today)+' aujourd\'hui'+(pi?' · → '+pi.to+' dans '+pi.left+' j':'')),mk('span',{class:'p-ct'},'départ le'),di,
         mk('button',{class:'m-mini',type:'button',onclick:()=>{S.accs[a.id].catStart=today;W(()=>PUT('accs/'+a.id+'/catStart',today));toast(a.name+' recommence au jour 1');pDrawSet();pDraw();}},'Recommencer')));
     }
     box.append(row);
@@ -942,7 +1025,7 @@ $('#p-next').addEventListener('click',()=>shiftDay(1));
 $('#p-label').addEventListener('click',()=>{if(pDay!==dayKey()){pDay=dayKey();pFollow=true;S.pubLog={};pDraw();GET('pubLog/'+pDay).then(v=>{if(v!==null){S.pubLog=v||{};pDraw();}});}});
 $('#p-setbtn').addEventListener('click',()=>{pSetOpen=!pSetOpen;pConfirmCat=null;pDraw();});
 
-window.mDraw=mDraw;window.pDraw=pDraw;window.navBadges=navBadges;window.accExists=accExists;
+window.mDraw=mDraw;window.pDraw=pDraw;window.navBadges=navBadges;window.accExists=accExists;window.autoPromote=autoPromote;
 })();
 
 
@@ -965,7 +1048,7 @@ async function sync(){
     if(e!==null)S.emps=e||{};if(a!==null)S.accs=a||{};if(s!==null)S.skus=s||{};if(p!==null)S.prog=p||{};if(t!==null)S.ts=t||{};
   }
   await syncTeam();
-  pickInah();buildDone();
+  pickInah();buildDone();if(window.autoPromote)autoPromote();if(window.rmPopup)rmPopup();
   const ae=document.activeElement;
   const typing=ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')&&ae.closest&&ae.closest('.main');
   if(!typing&&!document.querySelector('.modal-bg'))draw();else if(window.navBadges)navBadges();
