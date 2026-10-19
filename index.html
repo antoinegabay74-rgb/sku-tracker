@@ -731,12 +731,12 @@ const tgt=c=>Math.max(0,parseInt(c&&c.target,10)||0);
 // ---- programmes (cycles)
 const isProg=c=>c&&c.mode==='prog';
 const parsePat=s=>{const a=String(s==null?'':s).split(/[^0-9]+/).filter(Boolean).map(n=>Math.min(999,parseInt(n,10)));return a.length?a:[0];};
-const phasesOf=c=>(Array.isArray(c.phases)?c.phases:Object.values(c.phases||{})).filter(Boolean).map(p=>({days:Math.max(1,parseInt(p.days,10)||1),pattern:parsePat(p.pattern).join(',')}));
+const phasesOf=c=>(Array.isArray(c.phases)?c.phases:Object.values(c.phases||{})).filter(Boolean).map(p=>({days:Math.max(1,parseInt(p.days,10)||1),pattern:parsePat(p.pattern).join(','),inf:!!p.inf}));
 const dateOf=k=>{const[a,m,d]=String(k).split('-').map(Number);return new Date(a,(m||1)-1,d||1);};
 const dayNum=(start,day)=>Math.round((dateOf(day)-dateOf(start))/86400000)+1; // jour 1 = jour de départ
-function progTarget(c,n){if(n<1)return 0;let d=n-1;for(const p of phasesOf(c)){if(d<p.days){const pat=parsePat(p.pattern);return pat[d%pat.length];}d-=p.days;}return tgt(c);}
+function progTarget(c,n){if(n<1)return 0;let d=n-1;for(const p of phasesOf(c)){if(p.inf||d<p.days){const pat=parsePat(p.pattern);return pat[d%pat.length];}d-=p.days;}return tgt(c);}
 function goalFor(a,c,day){if(!c)return 0;if(!isProg(c))return tgt(c);return progTarget(c,dayNum(a.start||day,day));}
-function progLabel(c){const ph=phasesOf(c);return ph.map(p=>p.pattern.replace(/,/g,'-')+' pendant '+p.days+' j').join(' → ')+(ph.length?' → ':'')+'puis '+tgt(c)+' / jour';}
+function progLabel(c){const ph=phasesOf(c);const end=ph.length&&ph[ph.length-1].inf;return ph.map(p=>p.pattern.replace(/,/g,'-')+(p.inf?' sans fin':' pendant '+p.days+' j')).join(' → ')+(end?'':(ph.length?' → ':'')+'puis '+tgt(c)+' / jour');}
 function accExists(name,exceptId){const n=String(name).trim().toLowerCase();return Object.entries(S.accs||{}).some(([id,v])=>id!==exceptId&&String((v&&v.name)||v).trim().toLowerCase()===n);}
 
 function dayLabel(k){
@@ -874,16 +874,18 @@ function pDrawSet(){
         dI.addEventListener('change',()=>{const n=phasesOf(c);n[i].days=Math.max(1,parseInt(dI.value,10)||1);savePhases(c,n);});
         const pI=mk('input',{class:'m-in p-pat',type:'text',value:p.pattern.replace(/,/g,', '),'aria-label':'Articles par jour de l\'étape '+(i+1),placeholder:'ex : 1, 2, 3'});
         pI.addEventListener('change',()=>{const n=phasesOf(c);n[i].pattern=parsePat(pI.value).join(',');savePhases(c,n);});
-        card.append(mk('div',{class:'p-ph'},mk('span',{class:'p-step'},'Étape '+(i+1)),mk('span',{class:'p-ct'},'pendant'),dI,mk('span',{class:'p-ct'},'jours, poster'),pI,mk('span',{class:'p-ct'},parsePat(p.pattern).length>1?'(en boucle)':'par jour'),
+        const last=i===ph.length-1;
+        const infB=last?mk('button',{class:'p-ctag',type:'button','aria-pressed':String(!!p.inf),title:'Répéter cette étape pour toujours',onclick:()=>{const n=phasesOf(c);n[i].inf=!n[i].inf;savePhases(c,n);toast(n[i].inf?'Étape '+(i+1)+' : sans fin':'Étape '+(i+1)+' : '+n[i].days+' jours');}},'∞ Sans fin'):null;
+        card.append(mk('div',{class:'p-ph'},mk('span',{class:'p-step'},'Étape '+(i+1)),p.inf?mk('span',{class:'p-ct',style:'font-weight:800;color:#1b1f17'},'pour toujours, poster'):[mk('span',{class:'p-ct'},'pendant'),dI,mk('span',{class:'p-ct'},'jours, poster')],pI,mk('span',{class:'p-ct'},parsePat(p.pattern).length>1?'(en boucle)':'par jour'),infB,
           mk('button',{class:'m-mini',type:'button','aria-label':'Supprimer l\'étape '+(i+1),onclick:()=>{const n=phasesOf(c);n.splice(i,1);savePhases(c,n);}},'✕')));
       });
       const fI=mk('input',{class:'p-num',type:'number',min:'0',max:'999',value:String(tgt(c)),'aria-label':'Articles par jour après le programme'});
       fI.addEventListener('change',()=>catPatch(c,{target:Math.max(0,parseInt(fI.value,10)||0)}));
       card.append(
-        mk('div',{class:'p-ph'},mk('button',{class:'m-mini',type:'button',onclick:()=>{const n=phasesOf(c);n.push({days:10,pattern:String((n.length&&parsePat(n[n.length-1].pattern).slice(-1)[0])||5)});savePhases(c,n);}},'+ Ajouter une étape')),
-        mk('div',{class:'p-ph'},mk('span',{class:'p-step'},'Ensuite'),mk('span',{class:'p-ct'},'tous les jours :'),fI,mk('span',{class:'p-ct'},'articles par compte')));
-      const prev=[];for(let d=1;d<=Math.min(60,phasesOf(c).reduce((s,p)=>s+p.days,0)+3);d++)prev.push(mk('span',{class:'p-pv',title:'Jour '+d},mk('small',{},'J'+d),String(progTarget(c,d))));
-      card.append(mk('div',{class:'p-prev'},prev));
+        mk('div',{class:'p-ph'},mk('button',{class:'m-mini',type:'button',onclick:()=>{const n=phasesOf(c);if(n.length)n[n.length-1].inf=false;n.push({days:10,pattern:String((n.length&&parsePat(n[n.length-1].pattern).slice(-1)[0])||5)});savePhases(c,n);}},'+ Ajouter une étape')),
+        (ph.length&&ph[ph.length-1].inf)?'':mk('div',{class:'p-ph'},mk('span',{class:'p-step'},'Ensuite'),mk('span',{class:'p-ct'},'tous les jours :'),fI,mk('span',{class:'p-ct'},'articles par compte')));
+      const prev=[];const php=phasesOf(c),infEnd=php.length&&php[php.length-1].inf;for(let d=1;d<=Math.min(60,php.reduce((s,p,j)=>s+(p.inf?0:p.days),0)+(infEnd?Math.max(6,parsePat(php[php.length-1].pattern).length*3):3));d++)prev.push(mk('span',{class:'p-pv',title:'Jour '+d},mk('small',{},'J'+d),String(progTarget(c,d))));
+      if(infEnd)prev.push(mk('span',{class:'p-pv',title:'Se répète pour toujours'},mk('small',{},'…'),'∞'));card.append(mk('div',{class:'p-prev'},prev));
     }
     box.append(card);
   });
