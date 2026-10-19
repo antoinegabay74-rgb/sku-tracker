@@ -509,7 +509,7 @@ function drawD(){
   const skus=skuArr(),accs=accArr();
   let tot=0,done=0;const per=accs.map(a=>{const s=accStats(a,skus);tot+=s.tot;done+=s.done;return{a,...s};});
   const pct=tot?Math.round(done/tot*100):0;
-  const byDay={};Object.values(S.ts||{}).forEach(d=>{if(d)byDay[d]=(byDay[d]||0)+1;});
+  const byDay={};Object.entries(S.ts||{}).forEach(([k,d])=>{if(!d)return;const q=k.split('__');if(!S.prog[k]||!S.skus[q[0]]||!S.accs[q[1]])return;byDay[d]=(byDay[d]||0)+1;}); // seuls les SKU encore cochés et existants comptent
   const days=Object.keys(byDay).sort((x,y)=>y.localeCompare(x)).slice(0,21);
   const today=new Date().toISOString().slice(0,10);
   const fmt=d=>{const[y,m,j]=d.split('-');return j+'/'+m+'/'+y;};
@@ -584,9 +584,10 @@ function importB(){
   drawS();
 }
 function addAcc(){const i=$('#newacc');const name=i.value.trim();if(!name){i.focus();return;}if(accExists(name)){toast('⚠️ Le compte « '+name+' » existe déjà');i.select();return;}const id=uid();const empIds={};Object.keys(S.emps||{}).forEach(k=>empIds[k]=true);S.accs[id]={name,empIds};i.value='';W(()=>PUT('accs/'+id,S.accs[id]));toast('Compte « '+name+' » ajouté');drawS();}
-function delAcc(a){delete S.accs[a.id];accDel=null;W(()=>PUT('accs/'+a.id,null));toast('Compte supprimé');drawS();}
+function dropTicks(pos,id){const ch={},tc={};Object.keys(S.prog||{}).forEach(k=>{if(k.split('__')[pos]===id){ch[k]=null;delete S.prog[k];}});Object.keys(S.ts||{}).forEach(k=>{if(k.split('__')[pos]===id){tc[k]=null;delete S.ts[k];}});buildDone();return async()=>{if(Object.keys(ch).length)await PATCH('prog',ch);if(Object.keys(tc).length)await PATCH('ts',tc);};}
+function delAcc(a){delete S.accs[a.id];accDel=null;const clean=dropTicks(1,a.id);W(async()=>{await PUT('accs/'+a.id,null);await clean();});toast('Compte supprimé');drawS();}
 function resetAcc(a){const ch={},tc={};Object.keys(S.prog).forEach(k=>{if(k.split('__')[1]===a.id){ch[k]=null;delete S.prog[k];}});Object.keys(S.ts).forEach(k=>{if(k.split('__')[1]===a.id){tc[k]=null;delete S.ts[k];}});accReset=null;buildDone();W(async()=>{if(Object.keys(ch).length)await PATCH('prog',ch);if(Object.keys(tc).length)await PATCH('ts',tc);});toast('Coches de « '+a.name+' » remises à zéro');drawS();}
-function delSku(id){delete S.skus[id];skuDel=null;W(()=>PUT('skus/'+id,null));toast('SKU supprimé');drawS();}
+function delSku(id){delete S.skus[id];skuDel=null;const clean=dropTicks(0,id);W(async()=>{await PUT('skus/'+id,null);await clean();});toast('SKU supprimé');drawS();}
 function setPrice(id,val){const s=S.skus[id];if(!s)return;const p=String(val).trim();if(!p)return;const n=parseFloat(p.replace(',','.'));s.price=fmtP(p);if(!isNaN(n))s.basePrice=Math.floor(n)+0.9;W(()=>PATCH('skus/'+id,{price:s.price,basePrice:s.basePrice}));toast('Prix mis à jour : '+s.price+' €');}
 function exportAcc(a){
   const list=skuArr().filter(s=>onAcc(s,a));if(!list.length){toast('Aucun SKU sur ce compte');return;}
