@@ -254,7 +254,10 @@ textarea.inp{resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;f
 .p-ctags{display:flex;gap:5px;flex-wrap:wrap}
 .p-ctag{border:1.5px solid #ddd;background:#fff;border-radius:99px;padding:4px 10px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;color:#666;display:inline-flex;align-items:center;gap:5px}
 .p-ctag i{width:9px;height:9px;border-radius:3px;display:inline-block}
-.p-ctag[aria-pressed="true"]{color:#1a1a1a;border-color:#1a1a1a;background:#f3f3f3}
+.p-ctag[aria-pressed="true"]{color:#fff;border-color:#1b1f17;background:#1b1f17}
+.p-ctag[aria-pressed="true"] i{box-shadow:0 0 0 2px #fff}
+.p-arow .p-ctags .p-ctag::before{content:"";width:12px;height:12px;border-radius:50%;border:2px solid #c3c8bb;box-sizing:border-box;flex:0 0 12px}
+.p-arow .p-ctags .p-ctag[aria-pressed="true"]::before{border:3px solid #fff;background:#7cc23a}
 .p-total{font-size:13px;font-weight:700;color:#4a7c14}
 .p-jour{display:inline-block;margin-left:8px;font-size:11px;font-weight:800;color:#1e6fd9;background:#e6f0fd;border-radius:99px;padding:2px 8px;vertical-align:middle}
 .p-ccard{border:1px solid #e6e8e1;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:9px;background:#fbfcf9}
@@ -898,8 +901,8 @@ function pDrawSet(){
     mk('div',{class:'p-total'},'Aujourd\'hui : '+tot+' articles à poster sur '+nAct+' comptes'));
   if(!accs.length)box.append(mk('div',{class:'help'},'Aucun compte. Ajoute-en un ci-dessous.'));
   accs.forEach(a=>{
-    const tags=mk('span',{class:'p-ctags'});
-    cats.forEach(c=>tags.append(mk('button',{class:'p-ctag',type:'button','aria-pressed':String(a.cat===c.id),onclick:()=>pSetCat(a.id,c.id)},mk('i',{style:'background:'+(c.color||'#999')}),c.name)));
+    const tags=mk('span',{class:'p-ctags',role:'radiogroup','aria-label':'Catégorie de '+a.name});
+    cats.forEach(c=>tags.append(mk('button',{class:'p-ctag',type:'button',role:'radio','aria-checked':String(a.cat===c.id),'aria-pressed':String(a.cat===c.id),onclick:()=>pSetCat(a.id,c.id)},mk('i',{style:'background:'+(c.color||'#999')}),c.name)));
     tags.append(mk('button',{class:'p-ctag',type:'button','aria-pressed':String(!S.pubCats[a.cat]),onclick:()=>pSetCat(a.id,null)},'Aucune'));
     const row=mk('div',{class:'p-arow'},mk('span',{class:'p-an'},a.name),tags);
     const c=S.pubCats[a.cat];
