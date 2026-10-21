@@ -120,6 +120,7 @@ textarea.inp{resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;f
 .msg{font-size:12.5px;font-weight:700;padding:8px 11px;border-radius:8px}
 .msg.ok{background:var(--brand-soft);color:var(--brand-dk)}
 .msg.err{background:#fde8e8;color:#a32020}
+.msg.warn{background:#fff3dc;color:#6b4200}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
 .sv{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums}
@@ -380,7 +381,7 @@ textarea.inp{resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;f
 <div id="ld" style="display:flex;align-items:center;justify-content:center;height:100vh;font-size:14px;color:#888">Connexion…</div>
 <script>
 const DB='https://vinted-9aa6a-default-rtdb.europe-west1.firebasedatabase.app';
-let S={emps:{},accs:{},skus:{},prog:{},ts:{}};
+let S={emps:{},accs:{},skus:{},prog:{},ts:{},sent:{}};
 let curE='',curTab='a';
 
 // ---------- Firebase (REST)
@@ -577,7 +578,7 @@ function drawS(){
     mk('div',{class:'tags'},
       mk('button',{class:'tag',type:'button','aria-pressed':String(impAccs==='all'),onclick:()=>{impAccs='all';drawS();}},'Tous les comptes'),
       accs.map(a=>mk('button',{class:'tag',type:'button','aria-pressed':String(impAccs!=='all'&&!!impAccs[a.id]),onclick:()=>{if(impAccs==='all')impAccs={};if(impAccs[a.id])delete impAccs[a.id];else impAccs[a.id]=true;if(!Object.keys(impAccs).length)impAccs='all';drawS();}},a.name))),
-    impMsg?mk('div',{class:'msg '+impMsg.k},impMsg.t):null,
+    impMsg?mk('div',{class:'msg '+impMsg.k,style:'white-space:pre-line'},impMsg.t):null,
     mk('div',{class:'row'},mk('button',{class:'btn g',type:'button',onclick:importB},'⬆ Importer')));
   // Comptes
   const accCard=mk('div',{class:'card'},mk('h3',{},'🏪 Comptes Vinted ('+accs.length+')'),
@@ -607,15 +608,56 @@ function drawS(){
 }
 function fmtP(p){const n=parseFloat(String(p).replace(',','.'));return isNaN(n)?String(p):(Math.floor(n)+0.9).toFixed(2).replace('.',',');}
 function baseP(p){const n=parseFloat(String(p).replace(',','.'));return isNaN(n)?0:Math.floor(n)+0.9;}
+// Historique « déjà envoyé » : sent/<compte>/<code SKU> = date du premier envoi
+const skuKey=n=>String(n).trim().toLowerCase().replace(/[.#$\[\]\/]/g,'_');
+function wasSent(code,a){
+  const k=skuKey(code);if(S.sent&&S.sent[a.id]&&S.sent[a.id][k])return true;
+  return skuArr().some(s=>skuKey(s.name)===k&&onAcc(s,a));
+}
+function markSent(pairs){ // pairs: [[accId,code],...]
+  if(!pairs.length)return null;const t=dayKey(),ch={};
+  pairs.forEach(([aid,code])=>{const k=skuKey(code);S.sent[aid]=S.sent[aid]||{};if(!S.sent[aid][k]){S.sent[aid][k]=t;ch[aid+'/'+k]=t;}});
+  return Object.keys(ch).length?()=>PATCH('sent',ch):null;
+}
+let _bf=false;
+function backfillSent(){ // une fois par chargement : mémorise les SKU déjà présents sur chaque compte
+  if(_bf||!Object.keys(S.skus||{}).length||!Object.keys(S.accs||{}).length)return;_bf=true;
+  const pairs=[];const accs=accArr();skuArr().forEach(x=>accs.forEach(a=>{if(onAcc(x,a))pairs.push([a.id,x.name]);}));
+  const sv=markSent(pairs);if(sv)W(sv);
+}
 function importB(){
   const txt=$('#bulk').value;const lines=txt.split('\n').map(l=>l.trim()).filter(Boolean);
   if(!lines.length){impMsg={k:'err',t:'Colle ta liste de SKU.'};drawS();return;}
-  const accIds=impAccs==='all'?'all':Object.assign({},impAccs);const add={};let bad=0;
-  lines.forEach(line=>{const parts=line.split(/\s+/);if(parts.length<2){bad++;return;}const price=parts[parts.length-1],name=parts.slice(0,-1).join(' ');if(!name||isNaN(parseFloat(price.replace(',','.')))){bad++;return;}
-    const id=uid();add[id]={name,price:fmtP(price),basePrice:baseP(price),empIds:'all',accIds};S.skus[id]=add[id];});
-  const n=Object.keys(add).length;
-  impMsg=n?{k:'ok',t:'✓ '+n+' SKU ajouté'+(n>1?'s':'')+(bad?' · '+bad+' ligne(s) ignorée(s)':'')}:{k:'err',t:'Aucun SKU valide. Format : code espace prix.'};
-  if(n){$('#bulk').value='';W(()=>PATCH('skus',add));}
+  const accs=accArr();const targets=impAccs==='all'?accs:accs.filter(a=>impAccs[a.id]);
+  if(!targets.length){impMsg={k:'err',t:'Choisis au moins un compte.'};drawS();return;}
+  const ch={},sent=[],skipped={};let bad=0,newSku=0,links=0;
+  lines.forEach(line=>{
+    const parts=line.split(/\s+/);if(parts.length<2){bad++;return;}
+    const price=parts[parts.length-1],name=parts.slice(0,-1).join(' ');
+    if(!name||isNaN(parseFloat(price.replace(',','.')))){bad++;return;}
+    const fresh=[],already=[];
+    targets.forEach(a=>(wasSent(name,a)?already:fresh).push(a));
+    if(already.length)skipped[name]=(skipped[name]||[]).concat(already.map(a=>a.name));
+    if(!fresh.length)return;
+    const existing=skuArr().find(x=>skuKey(x.name)===skuKey(name));
+    if(existing){
+      const acc={};accs.forEach(x=>{if(onAcc(existing,x))acc[x.id]=true;});fresh.forEach(a=>acc[a.id]=true);
+      S.skus[existing.id].accIds=acc;S.skus[existing.id].empIds='all';ch[existing.id+'/accIds']=acc;ch[existing.id+'/empIds']='all';
+    }else{
+      const id=uid();const acc={};fresh.forEach(a=>acc[a.id]=true);
+      S.skus[id]={name,price:fmtP(price),basePrice:baseP(price),empIds:'all',accIds:acc};ch[id]=S.skus[id];newSku++;
+    }
+    fresh.forEach(a=>sent.push([a.id,name]));links+=fresh.length;
+  });
+  const save=markSent(sent);
+  if(Object.keys(ch).length)W(async()=>{await PATCH('skus',ch);if(save)await save();});
+  const sk=Object.keys(skipped);
+  const lines2=[];
+  if(links)lines2.push('✓ Ajouté sur '+links+' compte'+(links>1?'s':'')+(newSku?' · '+newSku+' nouveau'+(newSku>1?'x':'')+' SKU':''));
+  if(sk.length)lines2.push('⚠️ Déjà envoyé, pas remis : '+sk.slice(0,12).map(k=>k+' → '+[...new Set(skipped[k])].join(', ')).join(' ; ')+(sk.length>12?' … (+'+(sk.length-12)+' autres)':''));
+  if(bad)lines2.push(bad+' ligne(s) ignorée(s) : format « code prix »');
+  impMsg={k:links?(sk.length?'warn':'ok'):'err',t:lines2.join('\n')||'Rien à ajouter.'};
+  if(links)$('#bulk').value='';
   drawS();
 }
 function addAcc(){const i=$('#newacc');const name=i.value.trim();if(!name){i.focus();return;}if(accExists(name)){toast('⚠️ Le compte « '+name+' » existe déjà');i.select();return;}const id=uid();const empIds={};Object.keys(S.emps||{}).forEach(k=>empIds[k]=true);S.accs[id]={name,empIds};i.value='';W(()=>PUT('accs/'+id,S.accs[id]));toast('Compte « '+name+' » ajouté');drawS();}
@@ -638,8 +680,8 @@ function copyModal(from){
   const list=mk('div',{class:'list'},others.map(a=>{const t=mk('button',{class:'tag',type:'button','aria-pressed':'false',style:'text-align:left;border-radius:9px;padding:9px 12px'},a.name);t.addEventListener('click',()=>{if(targets[a.id])delete targets[a.id];else targets[a.id]=true;t.setAttribute('aria-pressed',String(!!targets[a.id]));upd();});return t;}));
   btn.addEventListener('click',()=>{
     const ids=Object.keys(targets);const ch={};let c=0;
-    const all=accArr();skuArr().forEach(s=>{if(!onAcc(s,from))return;const acc={};all.forEach(x=>{if(onAcc(s,x))acc[x.id]=true;});let add=0;ids.forEach(t=>{if(!acc[t]){acc[t]=true;add++;}});if(!add)return;S.skus[s.id].accIds=acc;S.skus[s.id].empIds='all';ch[s.id+'/accIds']=acc;ch[s.id+'/empIds']='all';c++;});
-    if(c)W(()=>PATCH('skus',ch));bg.remove();toast(c+' SKU copiés vers '+ids.length+' compte'+(ids.length>1?'s':''));draw();
+    const all=accArr();const sentPairs=[];let skip=0;skuArr().forEach(s=>{if(!onAcc(s,from))return;const acc={};all.forEach(x=>{if(onAcc(s,x))acc[x.id]=true;});let add=0;ids.forEach(t=>{const ta=all.find(x=>x.id===t);if(acc[t])return;if(ta&&wasSent(s.name,ta)){skip++;return;}acc[t]=true;add++;sentPairs.push([t,s.name]);});if(!add)return;S.skus[s.id].accIds=acc;S.skus[s.id].empIds='all';ch[s.id+'/accIds']=acc;ch[s.id+'/empIds']='all';c++;});
+    const sv=markSent(sentPairs);if(c)W(async()=>{await PATCH('skus',ch);if(sv)await sv();});bg.remove();toast(c+' SKU copiés vers '+ids.length+' compte'+(ids.length>1?'s':'')+(skip?' · '+skip+' déjà envoyé(s), pas remis':''));draw();
   });
   bg.append(mk('div',{class:'modal',role:'dialog','aria-modal':'true'},mk('h3',{},'Copier les SKU de « '+from.name+' »'),mk('div',{class:'help'},n+' SKU · choisis les comptes de destination'),list,
     mk('div',{class:'row',style:'justify-content:flex-end'},mk('button',{class:'btn',type:'button',onclick:()=>bg.remove()},'Annuler'),btn)));
@@ -1046,12 +1088,12 @@ function draw(){
 }
 async function sync(){
   const v0=WV;
-  const[e,a,s,p,t]=await Promise.all([GET('emps'),GET('accs'),GET('skus'),GET('prog'),GET('ts')]);
+  const[e,a,s,p,t,sn]=await Promise.all([GET('emps'),GET('accs'),GET('skus'),GET('prog'),GET('ts'),GET('sent')]);
   if(WV===v0&&PEND===0){
-    if(e!==null)S.emps=e||{};if(a!==null)S.accs=a||{};if(s!==null)S.skus=s||{};if(p!==null)S.prog=p||{};if(t!==null)S.ts=t||{};
+    if(e!==null)S.emps=e||{};if(a!==null)S.accs=a||{};if(s!==null)S.skus=s||{};if(p!==null)S.prog=p||{};if(t!==null)S.ts=t||{};if(sn!==null)S.sent=sn||{};
   }
   await syncTeam();
-  pickInah();buildDone();if(window.autoPromote)autoPromote();if(window.rmPopup)rmPopup();
+  pickInah();buildDone();backfillSent();if(window.autoPromote)autoPromote();if(window.rmPopup)rmPopup();
   const ae=document.activeElement;
   const typing=ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')&&ae.closest&&ae.closest('.main');
   if(!typing&&!document.querySelector('.modal-bg'))draw();else if(window.navBadges)navBadges();
