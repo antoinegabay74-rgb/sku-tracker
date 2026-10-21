@@ -410,6 +410,8 @@ function size(){cv.width=innerWidth*devicePixelRatio;cv.height=innerHeight*devic
 function burst(x,y,n=40){if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;const cols=['#ff4d5e','#ffb020','#1fbf8f','#4a7c14','#1e88e5'];for(let i=0;i<n;i++){const a=Math.random()*Math.PI*2,v=3+Math.random()*6;parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-4,r:3+Math.random()*4,c:cols[i%5],life:60+Math.random()*30,rot:Math.random()*6});}if(!raf)raf=requestAnimationFrame(tickFx);}
 function tickFx(){const d=devicePixelRatio;cx.clearRect(0,0,cv.width,cv.height);parts=parts.filter(q=>q.life>0);parts.forEach(q=>{q.x+=q.vx;q.y+=q.vy;q.vy+=.25;q.vx*=.98;q.life--;q.rot+=.2;cx.save();cx.globalAlpha=Math.min(1,q.life/30);cx.translate(q.x*d,q.y*d);cx.rotate(q.rot);cx.fillStyle=q.c;cx.fillRect(-q.r*d,-q.r*d/2,q.r*2*d,q.r*d);cx.restore();});raf=parts.length?requestAnimationFrame(tickFx):0;}
 const ptOf=e=>(e&&e.clientX)?[e.clientX,e.clientY]:[innerWidth/2,innerHeight/3];
+async function copyAll(codes,f){const txt=codes.join('\n');const what=codes.length+' SKU'+(f==='todo'?' à publier':f==='done'?' publiés':'')+' copiés';
+  try{await navigator.clipboard.writeText(txt);toast('📋 '+what);}catch(e){const ta=mk('textarea',{style:'position:fixed;top:0;left:0;opacity:0'});ta.value=txt;document.body.append(ta);ta.select();let ok=false;try{ok=document.execCommand('copy');}catch(_){}ta.remove();toast(ok?'📋 '+what:'Copie impossible sur cet appareil');}}
 async function copyTxt(t,label){try{await navigator.clipboard.writeText(t);toast((label||'Copié')+' : '+t);}catch(e){toast('Copie impossible, sélectionne le texte');}}
 
 // ================= SKU =================
@@ -512,7 +514,8 @@ function drawAccount(v){
           chip('À publier · '+(tot-done),sFilter==='todo',()=>{sFilter='todo';drawA();}),
           chip('Publiés · '+done,sFilter==='done',()=>{sFilter='done';drawA();}),
           chip('Tous · '+tot,sFilter==='all',()=>{sFilter='all';drawA();}),
-          chip(sortLbl,sSort!=='none',()=>{sSort=sSort==='none'?'desc':sSort==='desc'?'asc':'none';drawA();}))),
+          chip(sortLbl,sSort!=='none',()=>{sSort=sSort==='none'?'desc':sSort==='desc'?'asc':'none';drawA();})),
+        list.length?mk('button',{class:'btn g',type:'button',title:'Copie les codes de la liste affichée, un par ligne, sans les prix',onclick:()=>copyAll(list.map(x=>String(x.name)),sFilter)},'📋 Copier les '+list.length+' SKU'):null),
       !tot?mk('div',{class:'s-empty'},mk('b',{},'Aucun SKU sur ce compte'),'Importe des SKU ou copie ceux d\'un autre compte dans « Réglages SKU ».')
       :!list.length?mk('div',{class:'s-empty'},sFilter==='todo'&&!q?[mk('b',{},'🎉 Tout est publié sur ce compte'),next?mk('button',{class:'btn g',type:'button',style:'margin-top:10px',onclick:()=>{openAcc=next.id;drawA();}},'Compte suivant : '+next.name+' ›'):null]:'Aucun SKU ne correspond.')
       :mk('div',{class:'s-list'},list.map(s=>skuRow(s,a)))));
