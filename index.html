@@ -118,7 +118,15 @@ textarea.inp{resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;f
 .tg-dot{width:9px;height:9px;border-radius:3px;display:inline-block;flex:0 0 9px}
 .tg-s{font-size:11px;font-weight:700;color:var(--muted);display:flex;flex-direction:column;gap:3px;width:100%;font-variant-numeric:tabular-nums}
 .tg-bar{display:block;height:4px;background:#eceee8;border-radius:99px;overflow:hidden;width:100%}
-.tg-bar i{display:block;height:100%;border-radius:99px}
+.tg-bar i{display:block;height:100%;border-radius:99px;background:var(--brand)}
+.tg-groups{display:flex;flex-direction:column;gap:14px}
+.tg-row{display:flex;flex-direction:column;gap:7px}
+.tg-rh{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tg-rn{font-weight:800;font-size:13.5px;text-transform:uppercase;letter-spacing:.8px}
+.tg-rc{font-size:11.5px;color:var(--muted);font-weight:600}
+.tag.low{border-color:var(--red);box-shadow:0 0 0 1px var(--red) inset}
+.tag.low .tg-s{color:#a32020}
+.tag.low[aria-pressed="true"]{box-shadow:0 0 0 2px var(--red) inset}
 .li{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;border-top:1px solid #eef0ea}
 .li .grow{flex:1 1 180px;min-width:0}
 .li .t{font-weight:700;overflow-wrap:anywhere}
@@ -585,9 +593,8 @@ function drawS(){
   const imp=mk('div',{class:'card'},mk('h3',{},'⬆ Importer des SKU'),mk('div',{class:'help'},'Une ligne par SKU : le code puis le prix. Exemple : « sz483748392948 59 ». Le prix est arrondi en ,90.'),
     mk('textarea',{class:'inp',id:'bulk',rows:'5',placeholder:'sz483748392948 59\nsz374829103847 35'}),
     mk('div',{class:'help',style:'font-weight:700;color:var(--ink)'},'Sur quels comptes ?'),
-    mk('div',{class:'tags'},
-      mk('button',{class:'tag',type:'button','aria-pressed':String(impAccs==='all'),onclick:()=>{impAccs='all';drawS();}},'Tous les comptes'),
-      accs.map(a=>mk('button',{class:'tag',type:'button','aria-pressed':String(impAccs!=='all'&&!!impAccs[a.id]),onclick:()=>{if(impAccs==='all')impAccs={};if(impAccs[a.id])delete impAccs[a.id];else impAccs[a.id]=true;if(!Object.keys(impAccs).length)impAccs='all';drawS();}},accTagBody(a,skus)))),
+    mk('div',{class:'tags'},mk('button',{class:'tag',type:'button','aria-pressed':String(impAccs==='all'),onclick:()=>{impAccs='all';drawS();}},'Tous les comptes')),
+    accGroups(accs,skus),
     impMsg?mk('div',{class:'msg '+impMsg.k,style:'white-space:pre-line'},impMsg.t):null,
     mk('div',{class:'row'},mk('button',{class:'btn g',type:'button',onclick:importB},'⬆ Importer')));
   // Comptes
@@ -619,10 +626,26 @@ function drawS(){
 // Étiquette de compte : nom à la couleur de sa catégorie + avancement SKU
 function darken(hex,f){const m=/^#?([0-9a-f]{6})$/i.exec(hex||'');if(!m)return'#3a4034';const n=parseInt(m[1],16);const c=[n>>16,(n>>8)&255,n&255].map(v=>Math.round(v*(1-f)));return'rgb('+c.join(',')+')';}
 function accTagBody(a,skus){
-  const c=catOf(a);const st=accStats(a,skus);const pct=st.tot?Math.round(st.done/st.tot*100):null;const left=st.tot-st.done;
-  const col=c?darken(c.color,0.28):'#5d6457';
-  return [mk('span',{class:'tg-n',style:'color:'+col},c?mk('i',{class:'tg-dot',style:'background:'+(c.color||'#999'),title:c.name}):null,a.name),
-    mk('span',{class:'tg-s'},pct==null?'aucun SKU':pct+'% fait · '+left+' à publier',mk('span',{class:'tg-bar'},mk('i',{style:'width:'+(pct||0)+'%;background:'+(c?c.color:'var(--brand)')})))];
+  const st=accStats(a,skus);const pct=st.tot?Math.round(st.done/st.tot*100):null;const left=st.tot-st.done;
+  return [mk('span',{class:'tg-n'},a.name),
+    mk('span',{class:'tg-s'},(pct==null?'aucun SKU':pct+'% fait · '+left+' à publier')+(left<LOW_SKU?' · à réalimenter':''),mk('span',{class:'tg-bar'},mk('i',{style:'width:'+(pct||0)+'%'})))];
+}
+// Comptes regroupés par catégorie (anciens en haut), et dans chaque ligne ceux qui ont le moins de SKU à publier à gauche
+const LOW_SKU=10;
+function catDepth(c){let d=0,x=c,seen={};while(x&&x.next&&S.pubCats[x.next]&&!seen[x.next]&&d<10){seen[x.next]=1;x=S.pubCats[x.next];d++;}return d;}
+function accGroups(accs,skus){
+  const cats=Object.entries(S.pubCats||{}).filter(([,v])=>v&&typeof v==='object').map(([id,v])=>({id,...v})).sort((a,b)=>catDepth(a)-catDepth(b)||(b.order||0)-(a.order||0));
+  const groups=cats.map(c=>({c,list:accs.filter(a=>a.cat===c.id)})).filter(g=>g.list.length);
+  const none=accs.filter(a=>!(S.pubCats||{})[a.cat]);if(none.length)groups.push({c:null,list:none});
+  const toggle=a=>{if(impAccs==='all')impAccs={};if(impAccs[a.id])delete impAccs[a.id];else impAccs[a.id]=true;if(!Object.keys(impAccs).length)impAccs='all';drawS();};
+  return mk('div',{class:'tg-groups'},groups.map(g=>{
+    const rows=g.list.map(a=>({a,...accStats(a,skus)})).sort((x,y)=>(x.tot-x.done)-(y.tot-y.done)||x.a.name.localeCompare(y.a.name,'fr',{numeric:true}));
+    const allOn=impAccs!=='all'&&rows.every(r=>impAccs[r.a.id]);
+    return mk('div',{class:'tg-row'},
+      mk('div',{class:'tg-rh'},mk('span',{class:'tg-rn'},g.c?g.c.name:'Sans catégorie'),mk('span',{class:'tg-rc'},rows.length+' compte'+(rows.length>1?'s':'')+' · moins de SKU à gauche'),
+        mk('button',{class:'cp',type:'button',onclick:()=>{if(impAccs==='all')impAccs={};rows.forEach(r=>{if(allOn)delete impAccs[r.a.id];else impAccs[r.a.id]=true;});if(!Object.keys(impAccs).length)impAccs='all';drawS();}},allOn?'Désélectionner la ligne':'Sélectionner la ligne')),
+      mk('div',{class:'tags'},rows.map(r=>mk('button',{class:'tag'+((r.tot-r.done)<LOW_SKU?' low':''),type:'button','aria-pressed':String(impAccs!=='all'&&!!impAccs[r.a.id]),onclick:()=>toggle(r.a)},accTagBody(r.a,skus)))));
+  }));
 }
 function fmtP(p){const n=parseFloat(String(p).replace(',','.'));return isNaN(n)?String(p):(Math.floor(n)+0.9).toFixed(2).replace('.',',');}
 function baseP(p){const n=parseFloat(String(p).replace(',','.'));return isNaN(n)?0:Math.floor(n)+0.9;}
