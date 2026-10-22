@@ -112,6 +112,13 @@ textarea.inp{resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;f
 .tags{display:flex;flex-wrap:wrap;gap:6px}
 .tag{border:1.5px solid var(--line);background:#fff;border-radius:99px;padding:5px 11px;font-size:12.5px;font-weight:700;color:#5d6457}
 .tag[aria-pressed="true"]{background:var(--brand-soft);border-color:var(--brand);color:var(--brand-dk)}
+.tag:has(.tg-n){display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px;border-radius:12px;padding:7px 11px;min-width:150px;text-align:left}
+.tag[aria-pressed="true"]:has(.tg-n){box-shadow:0 0 0 2px var(--brand) inset}
+.tg-n{display:flex;align-items:center;gap:6px;font-weight:800;font-size:13px}
+.tg-dot{width:9px;height:9px;border-radius:3px;display:inline-block;flex:0 0 9px}
+.tg-s{font-size:11px;font-weight:700;color:var(--muted);display:flex;flex-direction:column;gap:3px;width:100%;font-variant-numeric:tabular-nums}
+.tg-bar{display:block;height:4px;background:#eceee8;border-radius:99px;overflow:hidden;width:100%}
+.tg-bar i{display:block;height:100%;border-radius:99px}
 .li{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;border-top:1px solid #eef0ea}
 .li .grow{flex:1 1 180px;min-width:0}
 .li .t{font-weight:700;overflow-wrap:anywhere}
@@ -580,7 +587,7 @@ function drawS(){
     mk('div',{class:'help',style:'font-weight:700;color:var(--ink)'},'Sur quels comptes ?'),
     mk('div',{class:'tags'},
       mk('button',{class:'tag',type:'button','aria-pressed':String(impAccs==='all'),onclick:()=>{impAccs='all';drawS();}},'Tous les comptes'),
-      accs.map(a=>mk('button',{class:'tag',type:'button','aria-pressed':String(impAccs!=='all'&&!!impAccs[a.id]),onclick:()=>{if(impAccs==='all')impAccs={};if(impAccs[a.id])delete impAccs[a.id];else impAccs[a.id]=true;if(!Object.keys(impAccs).length)impAccs='all';drawS();}},a.name))),
+      accs.map(a=>mk('button',{class:'tag',type:'button','aria-pressed':String(impAccs!=='all'&&!!impAccs[a.id]),onclick:()=>{if(impAccs==='all')impAccs={};if(impAccs[a.id])delete impAccs[a.id];else impAccs[a.id]=true;if(!Object.keys(impAccs).length)impAccs='all';drawS();}},accTagBody(a,skus)))),
     impMsg?mk('div',{class:'msg '+impMsg.k,style:'white-space:pre-line'},impMsg.t):null,
     mk('div',{class:'row'},mk('button',{class:'btn g',type:'button',onclick:importB},'⬆ Importer')));
   // Comptes
@@ -608,6 +615,14 @@ function drawS(){
   const b=document.getElementById('bulk');if(b)b.value=bulkVal;const na=document.getElementById('newacc');if(na)na.value=newAcc;
   if(keep&&keep!=='skuq'){const k=document.getElementById(keep);if(k)k.focus();}
   refocus('skuq');
+}
+// Étiquette de compte : nom à la couleur de sa catégorie + avancement SKU
+function darken(hex,f){const m=/^#?([0-9a-f]{6})$/i.exec(hex||'');if(!m)return'#3a4034';const n=parseInt(m[1],16);const c=[n>>16,(n>>8)&255,n&255].map(v=>Math.round(v*(1-f)));return'rgb('+c.join(',')+')';}
+function accTagBody(a,skus){
+  const c=catOf(a);const st=accStats(a,skus);const pct=st.tot?Math.round(st.done/st.tot*100):null;const left=st.tot-st.done;
+  const col=c?darken(c.color,0.28):'#5d6457';
+  return [mk('span',{class:'tg-n',style:'color:'+col},c?mk('i',{class:'tg-dot',style:'background:'+(c.color||'#999'),title:c.name}):null,a.name),
+    mk('span',{class:'tg-s'},pct==null?'aucun SKU':pct+'% fait · '+left+' à publier',mk('span',{class:'tg-bar'},mk('i',{style:'width:'+(pct||0)+'%;background:'+(c?c.color:'var(--brand)')})))];
 }
 function fmtP(p){const n=parseFloat(String(p).replace(',','.'));return isNaN(n)?String(p):(Math.floor(n)+0.9).toFixed(2).replace('.',',');}
 function baseP(p){const n=parseFloat(String(p).replace(',','.'));return isNaN(n)?0:Math.floor(n)+0.9;}
